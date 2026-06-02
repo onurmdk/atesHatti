@@ -12,23 +12,25 @@ using System;
 /// 
 /// Sorumluluk:
 /// ───────────
-/// • Oyun durumunu (Playing, GameOver) yönetir
+/// • Oyun durumunu (MainMenu, Playing, GameOver) yönetir
+/// • Ana Menüde zamanı dondurur, BAŞLAT ile oyunu başlatır
 /// • PlayerDeath event'ini dinleyip GameOver akışını tetikler
-/// • Time.timeScale kontrolü (pause/resume)
+/// • Time.timeScale kontrolü (menu freeze / gameplay / pause)
 /// • Sahne yeniden yükleme (restart)
-/// • GameOver UI panelini açıp kapatır
+/// • UI panellerini (MainMenu, GameOver) açıp kapatır
 /// • Oyun süresi takibi (istatistik için)
 /// 
 /// State Akış Diyagramı:
 /// ────────────────────
-///   ┌──────────┐   PlayerDeath    ┌───────────┐
-///   │ PLAYING  │ ───────────────▶ │ GAME_OVER │
-///   │          │                  │           │
-///   └──────────┘                  └─────┬─────┘
-///        ▲                              │
-///        │      RestartGame()           │
-///        │      (Scene Reload)          │
-///        └──────────────────────────────┘
+///   ┌───────────┐  StartGame()   ┌──────────┐  PlayerDeath   ┌───────────┐
+///   │ MAIN_MENU │ ─────────────▶ │ PLAYING  │ ─────────────▶ │ GAME_OVER │
+///   │ (donuk)   │                │ (aktif)  │                │ (donuk)   │
+///   └───────────┘                └──────────┘                └─────┬─────┘
+///                                      ▲                          │
+///                                      │     RestartGame()        │
+///                                      │     (Scene Reload)       │
+///                                      └──────────────────────────┘
+///                                      ↑ Reload → Awake → MainMenu
 /// 
 /// Neden Scene Reload ve Manual Reset Değil?
 /// ─────────────────────────────────────────
@@ -54,16 +56,21 @@ public class GameManager : MonoBehaviour
     /// <summary>
     /// Oyunun mevcut durumu.
     /// 
-    /// Neden sadece 2 state?
-    /// → Şu an oyun ya oynanıyor ya da bitmiş.
-    ///   İleride eklenmesi muhtemel state'ler:
-    ///     - Paused      (pause menü)
-    ///     - BossFight   (normal spawn durur, boss aktif)
-    ///     - Countdown   (3-2-1 geri sayım)
-    ///   Bunlar gerektiğinde enum'a eklenir — şu an YAGNI.
+    /// State Akış Diyagramı:
+    /// ────────────────────
+    ///   ┌───────────┐  StartGame()   ┌──────────┐  PlayerDeath   ┌───────────┐
+    ///   │ MAIN_MENU │ ─────────────▶ │ PLAYING  │ ─────────────▶ │ GAME_OVER │
+    ///   │ (donuk)   │                │ (aktif)  │                │ (donuk)   │
+    ///   └───────────┘                └──────────┘                └─────┬─────┘
+    ///                                      ▲                          │
+    ///                                      │     RestartGame()        │
+    ///                                      │     (Scene Reload)       │
+    ///                                      └──────────────────────────┘
+    ///                                      ↑ Reload → Awake → MainMenu
     /// </summary>
     public enum GameState
     {
+        MainMenu,
         Playing,
         GameOver
     }
@@ -97,11 +104,43 @@ public class GameManager : MonoBehaviour
     //  INSPECTOR — UI REFERANSLARI
     // ════════════════════════════════════════════════════════════════
 
+    [Header("─── Ana Menü UI ───")]
+    [Tooltip("Ana Menü paneli. Oyun açıldığında aktif olur.\n" +
+             "BAŞLAT butonuna basılınca kapanır.\n" +
+             "Hierarchy: Canvas → MainMenuPanel")]
+    [SerializeField]
+    private GameObject _mainMenuPanel;
+
+    [Header("─── Mağaza / HUD Paneli ───")]
+    [Tooltip("ShopPanel objesi. Ana Menüde toggle ile açılıp kapanır.\n" +
+             "Oyun başladığında HUD olarak görünür ama tıklanamaz.\n" +
+             "Hierarchy: Canvas → ShopPanel")]
+    [SerializeField]
+    private GameObject _shopPanel;
+
+    [Tooltip("ShopPanel üzerindeki CanvasGroup bileşeni.\n" +
+             "interactable ve blocksRaycasts kontrolü için kullanılır.\n" +
+             "Ana Menüde: tıklanabilir (mağaza). Oyun içinde: sadece görüntü (HUD).")]
+    [SerializeField]
+    private CanvasGroup _shopCanvasGroup;
+
     [Header("─── Game Over UI ───")]
     [Tooltip("Game Over paneli. Başlangıçta deaktif olmalı.\n" +
              "Hierarchy: Canvas → GameOverPanel")]
     [SerializeField]
     private GameObject _gameOverPanel;
+
+    [Header("─── Duraklatma (Pause) UI ───")]
+    [Tooltip("Duraklatma menü paneli. Oyun içinde Pause butonuna basılınca açılır.\n" +
+             "Hierarchy: Canvas → PausePanel")]
+    [SerializeField]
+    private GameObject _pausePanel;
+
+    [Tooltip("Sağ üst köşedeki durdurma butonu. Oyun sırasında görünür.\n" +
+             "MainMenu ve GameOver'da gizlenir.\n" +
+             "Hierarchy: Canvas → Btn_Pause")]
+    [SerializeField]
+    private GameObject _pauseButtonHUD;
 
     [Header("─── İstatistik Metinleri (Opsiyonel) ───")]
     [Tooltip("Hayatta kalma süresini gösteren text.\n" +
@@ -161,18 +200,35 @@ public class GameManager : MonoBehaviour
 
         ValidateSetup();
 
-        // ── Başlangıç state ──
-        _currentState = GameState.Playing;
+        // ── Başlangıç state: Ana Menü ──
+        // Oyun MainMenu state'inde başlar — timeScale = 0.
+        // Tüm gameplay sistemleri (spawner, shooting, hareket) donuk kalır.
+        // BAŞLAT butonuna basılınca StartGame() çağrılır → Playing'e geçilir.
+        _currentState = GameState.MainMenu;
         _elapsedTime  = 0f;
 
-        // ── timeScale'i garanti et ──
-        // Önceki oturumdan timeScale = 0 kalmış olabilir
-        // (restart sırasında scene reload timeScale'i resetlemez!)
-        Time.timeScale = 1f;
+        // ── Zamanı dondur (Ana Menü ekranı) ──
+        Time.timeScale = 0f;
 
-        // ── Game Over panelini kapat ──
+        // ── Panelleri ayarla ──
+        if (_mainMenuPanel != null)
+            _mainMenuPanel.SetActive(true);
+
         if (_gameOverPanel != null)
             _gameOverPanel.SetActive(false);
+
+        // ── ShopPanel: Ana Menüde başlangıçta gizli ──
+        // Oyuncu "MAĞAZAYI GÖRÜNTÜLE" butonuyla açacak.
+        if (_shopPanel != null)
+            _shopPanel.SetActive(false);
+
+        // ── Pause UI: Ana Menüde kapalı ──
+        // Sadece Playing state'inde Btn_Pause görünür olacak.
+        if (_pausePanel != null)
+            _pausePanel.SetActive(false);
+
+        if (_pauseButtonHUD != null)
+            _pauseButtonHUD.SetActive(false);
     }
 
     /// <summary>
@@ -231,6 +287,241 @@ public class GameManager : MonoBehaviour
     }
 
     // ════════════════════════════════════════════════════════════════
+    //  ANA MENÜ → OYUN BAŞLATMA
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Ana Menüdeki BAŞLAT butonuna basıldığında çağrılır.
+    /// 
+    /// Akış:
+    /// 1. State'i Playing'e geçir
+    /// 2. Time.timeScale = 1 → tüm gameplay sistemleri canlanır
+    /// 3. Ana Menü panelini kapat
+    /// 4. OnGameStateChanged event'i tetikle
+    /// 
+    /// Neden timeScale ile kontrol?
+    /// ────────────────────────────
+    /// Ana Menü ekranındayken timeScale = 0 olduğu için:
+    ///   - EnemySpawner timer'ı ilerlemez → düşman spawn olmaz
+    ///   - PlayerShooting timer'ı ilerlemez → mermi atılmaz
+    ///   - Bullet/Enemy hareketi durur → sahne donuk
+    ///   - _elapsedTime artmaz → süre sayılmaz
+    /// 
+    /// BAŞLAT'a basılınca timeScale = 1 → her şey aynı anda canlanır.
+    /// Hiçbir sisteme ayrıca "başla" komutu göndermeye gerek yok.
+    /// 
+    /// Inspector Bağlantısı:
+    ///   MainMenuPanel → BaşlatButton → OnClick → GameManager.StartGame()
+    /// </summary>
+    public void StartGame()
+    {
+        // Güvenlik: Sadece MainMenu state'inden çağrılabilir
+        if (_currentState != GameState.MainMenu)
+            return;
+
+        // ── State geçişi ──
+        _currentState = GameState.Playing;
+
+        // ── Zamanı başlat ──
+        Time.timeScale = 1f;
+
+        // ── Ana Menü panelini kapat ──
+        if (_mainMenuPanel != null)
+            _mainMenuPanel.SetActive(false);
+
+        // ── ShopPanel'i HUD moduna geçir ──
+        // Görünür ama tıklanamaz → oyun içinde sadece bilgi gösterir.
+        // interactable = false: Butonlar tepki vermez.
+        // blocksRaycasts = false: Dokunma olayları ShopPanel'i delip
+        //   alttaki gameplay'e (PlayerController touch input) ulaşır.
+        //   Bu olmadan oyuncu shop panelinin üzerinde gemiyi hareket ettiremez.
+        if (_shopPanel != null)
+            _shopPanel.SetActive(true);
+
+        if (_shopCanvasGroup != null)
+        {
+            _shopCanvasGroup.interactable = false;
+            _shopCanvasGroup.blocksRaycasts = false;
+        }
+
+        // ── Pause butonunu göster ──
+        // Oyun sırasında sağ üst köşede görünür olacak.
+        if (_pauseButtonHUD != null)
+            _pauseButtonHUD.SetActive(true);
+
+        // ── Diğer sistemleri bilgilendir ──
+        OnGameStateChanged?.Invoke(_currentState);
+
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        Debug.Log("[GameManager] Oyun başladı — State: Playing");
+        #endif
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  ANA MENÜ — MAĞAZA TOGGLE
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Ana Menüdeki "MAĞAZAYI GÖRÜNTÜLE" butonuna basıldığında çağrılır.
+    /// ShopPanel'in aktiflik durumunu tersine çevirir (toggle).
+    /// 
+    /// Açık → Kapalı: SetActive(false)
+    /// Kapalı → Açık: SetActive(true) + tıklanabilir
+    /// 
+    /// Neden CanvasGroup.interactable ve blocksRaycasts?
+    /// ─────────────────────────────────────────────────
+    /// Mağaza açıkken butonlara tıklanabilmeli (upgrade satın alma).
+    /// Bu yüzden interactable = true ve blocksRaycasts = true.
+    /// 
+    /// Oyun başladığında (StartGame) ise panel HUD'a dönüşür:
+    /// interactable = false → butonlar tepki vermez
+    /// blocksRaycasts = false → dokunma alttaki gameplay'e geçer
+    /// 
+    /// Güvenlik: Sadece MainMenu state'inde çalışır.
+    /// Oyun sırasında veya GameOver'da mağaza toggle edilemez.
+    /// 
+    /// Inspector Bağlantısı:
+    ///   MainMenuPanel → MağazaButton → OnClick → GameManager.ToggleShopMenu()
+    /// </summary>
+    public void ToggleShopMenu()
+    {
+        // Güvenlik: Sadece Ana Menüde çalışsın
+        if (_currentState != GameState.MainMenu)
+            return;
+
+        if (_shopPanel == null)
+            return;
+
+        // ── Toggle: Açıksa kapat, kapalıysa aç ──
+        bool isCurrentlyActive = _shopPanel.activeSelf;
+
+        if (isCurrentlyActive)
+        {
+            // ── Mağazayı kapat ──
+            _shopPanel.SetActive(false);
+        }
+        else
+        {
+            // ── Mağazayı aç (tam etkileşimli) ──
+            _shopPanel.SetActive(true);
+
+            if (_shopCanvasGroup != null)
+            {
+                _shopCanvasGroup.interactable = true;
+                _shopCanvasGroup.blocksRaycasts = true;
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  DURAKLATMA (PAUSE) SİSTEMİ
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Oyunu duraklatır. Btn_Pause'un OnClick'ine bağlanır.
+    /// 
+    /// Güvenlik: SADECE Playing state'inde çalışır.
+    /// GameOver'da Pause butonuna basılması engellenmiş olur —
+    /// çünkü GameOver'da zaten timeScale = 0 ve pause butonu gizli.
+    /// Ama yine de state guard koyuyoruz (defensive programming).
+    /// 
+    /// Akış:
+    /// 1. timeScale = 0 → tüm gameplay donar
+    /// 2. PausePanel açılır (Devam Et / Ana Menü butonları)
+    /// 3. Btn_Pause gizlenir (pause menüsü zaten açık)
+    /// 
+    /// State DEĞİŞMİYOR — hâlâ Playing.
+    /// Pause geçici bir UI durumu, state machine'de ayrı state değil.
+    /// Neden? → Pause'dan çıkınca Playing'e "geri dönmek" yerine
+    /// "hiç ayrılmamış" olmak daha temiz. HandlePlayerDeath
+    /// sadece Playing state'inde tetikleniyor, pause sırasında
+    /// timeScale = 0 olduğu için zaten ölüm gerçekleşemez.
+    /// 
+    /// Inspector Bağlantısı:
+    ///   Btn_Pause → OnClick → GameManager.PauseGame()
+    /// </summary>
+    public void PauseGame()
+    {
+        // Güvenlik: Sadece oyun oynanırken pause yapılabilir
+        if (_currentState != GameState.Playing)
+            return;
+
+        // ── Zamanı durdur ──
+        Time.timeScale = 0f;
+
+        // ── Pause panelini aç ──
+        if (_pausePanel != null)
+            _pausePanel.SetActive(true);
+
+        // ── Pause butonunu gizle (menü zaten açık) ──
+        if (_pauseButtonHUD != null)
+            _pauseButtonHUD.SetActive(false);
+
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        Debug.Log("[GameManager] Oyun duraklatıldı.");
+        #endif
+    }
+
+    /// <summary>
+    /// Oyuna devam eder. PausePanel'deki "DEVAM ET" butonuna bağlanır.
+    /// 
+    /// Akış:
+    /// 1. timeScale = 1 → gameplay devam eder
+    /// 2. PausePanel kapanır
+    /// 3. Btn_Pause tekrar görünür olur
+    /// 
+    /// Inspector Bağlantısı:
+    ///   PausePanel → Btn_Resume → OnClick → GameManager.ResumeGame()
+    /// </summary>
+    public void ResumeGame()
+    {
+        // ── Zamanı başlat ──
+        Time.timeScale = 1f;
+
+        // ── Pause panelini kapat ──
+        if (_pausePanel != null)
+            _pausePanel.SetActive(false);
+
+        // ── Pause butonunu tekrar göster ──
+        if (_pauseButtonHUD != null)
+            _pauseButtonHUD.SetActive(true);
+
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        Debug.Log("[GameManager] Oyuna devam edildi.");
+        #endif
+    }
+
+    /// <summary>
+    /// Duraklatma menüsünden Ana Menüye döner.
+    /// PausePanel'deki "ANA MENÜYE DÖN" butonuna bağlanır.
+    /// 
+    /// Akış:
+    /// 1. timeScale = 1 (KRİTİK — Scene reload timeScale'i sıfırlamaz)
+    /// 2. Sahneyi yeniden yükle → Awake → MainMenu state → timeScale = 0
+    /// 
+    /// Neden ayrı bir metod ve RestartGame() kullanmıyoruz?
+    /// → RestartGame OnBeforeRestart event'i tetikler (save, analytics).
+    ///   Ana Menüye dönüşte bunlar tetiklenmemeli — oyun henüz "bitmedi",
+    ///   oyuncu sadece menüye dönmek istiyor.
+    ///   İleride bu ayrımı kullanabiliriz (pause'dan dönüşte reklam gösterme,
+    ///   ama game over'da göster gibi).
+    /// 
+    /// Inspector Bağlantısı:
+    ///   PausePanel → Btn_MainMenu → OnClick → GameManager.ReturnToMainMenu()
+    /// </summary>
+    public void ReturnToMainMenu()
+    {
+        // ── timeScale'i ÖNCE resetle ──
+        Time.timeScale = 1f;
+
+        // ── Sahneyi yeniden yükle ──
+        // Awake çalışır → _currentState = MainMenu → timeScale = 0
+        // → MainMenuPanel açılır → tüm state temiz başlar
+        int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
+        SceneManager.LoadScene(currentSceneIndex);
+    }
+
+    // ════════════════════════════════════════════════════════════════
     //  GAME OVER AKIŞI
     // ════════════════════════════════════════════════════════════════
 
@@ -267,6 +558,10 @@ public class GameManager : MonoBehaviour
 
         // ── State geçişi ──
         _currentState = GameState.GameOver;
+
+        // ── Pause butonunu gizle (Game Over'da pause anlamsız) ──
+        if (_pauseButtonHUD != null)
+            _pauseButtonHUD.SetActive(false);
 
         // ── Diğer sistemleri bilgilendir ──
         OnGameStateChanged?.Invoke(_currentState);
@@ -387,8 +682,28 @@ public class GameManager : MonoBehaviour
             Debug.LogError("[GameManager] PlayerHealth atanmamış! " +
                            "Game Over tetiklenemeyecek.", this);
 
+        if (_mainMenuPanel == null)
+            Debug.LogWarning("[GameManager] MainMenuPanel atanmamış — " +
+                             "Ana Menü gösterilmeyecek.", this);
+
+        if (_shopPanel == null)
+            Debug.LogWarning("[GameManager] ShopPanel atanmamış — " +
+                             "Mağaza/HUD gösterilmeyecek.", this);
+
+        if (_shopCanvasGroup == null && _shopPanel != null)
+            Debug.LogWarning("[GameManager] ShopPanel'e CanvasGroup atanmamış — " +
+                             "Etkileşim kontrolü çalışmayacak.", this);
+
         if (_gameOverPanel == null)
             Debug.LogWarning("[GameManager] GameOverPanel atanmamış — " +
                              "Game Over UI gösterilmeyecek.", this);
+
+        if (_pausePanel == null)
+            Debug.LogWarning("[GameManager] PausePanel atanmamış — " +
+                             "Duraklatma menüsü gösterilmeyecek.", this);
+
+        if (_pauseButtonHUD == null)
+            Debug.LogWarning("[GameManager] PauseButtonHUD atanmamış — " +
+                             "Duraklatma butonu gösterilmeyecek.", this);
     }
 }
