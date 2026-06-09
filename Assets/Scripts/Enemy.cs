@@ -9,68 +9,70 @@ using UnityEngine.Pool;
 ///   yapan, ekran dışına çıkınca pool'a iade edilen düşman scripti.
 /// ╚══════════════════════════════════════════════════════════════════╝
 /// 
-/// Sorumluluk (SRP): SADECE hareket + drift bounce + pool iade + stat tutma.
-/// Çarpışma tespiti ve hasar alma ayrı bir Combat script'inde ele alınacak.
+/// Multi-Prefab Mimari:
+/// ────────────────────
+/// Her tier (Weak, Medium, Strong) ayrı bir prefab olarak tasarlanır.
+/// Stat'lar (HP, speed, drift, gold) Inspector'dan set edilir.
+/// Sprite, scale, color, animator — hepsi prefab'ın kendi asset'i.
+/// Kod hiçbir görsel değişiklik yapmaz — tamamen veri odaklı.
 /// 
-/// Tier Sistemi:
-/// ─────────────
-/// Bu script tek bir prefab için yazılmıştır. Tier bilgisi (Small/Medium/Large)
-/// EnemySpawner tarafından pool'dan alınırken Configure() metodu ile set edilir.
-/// Scale, color, HP, speed, gold — hepsi runtime'da atanır.
+/// EnemySpawner, CDF ile tier index seçer → ilgili pool'dan Get → Configure → SetActive.
 /// 
 /// Performans:
 /// ───────────
 /// • Update'te SIFIR GC allocation
 /// • Transform cache'li
-/// • Ekran sınırları dışarıdan set edilir (her düşman ayrıca Camera'ya erişmez)
-/// • Drift bounce: Basit float karşılaştırma, Physics2D kullanılmaz
+/// • Ekran sınırları dışarıdan set edilir
+/// • Drift bounce: Basit float karşılaştırma
 /// </summary>
 [RequireComponent(typeof(SpriteRenderer))]
 public class Enemy : MonoBehaviour
 {
     // ════════════════════════════════════════════════════════════════
-    //  DÜŞMAN STATLARI
+    //  DÜŞMAN STATLARI (Inspector'dan Set Edilir)
     // ════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Düşmanın mevcut stat değerleri.
-    /// Configure() ile EnemySpawner tarafından set edilir.
-    /// Public getter'lar üzerinden Combat sistemi tarafından okunur.
-    /// 
-    /// Neden ayrı struct değil de düz field'lar?
-    /// → Struct kullanmak güzel bir abstraction olurdu ama
-    ///   Combat sistemi her frame HP okuyacak. Struct field'ına
-    ///   erişmek (enemy.Stats.currentHp) bir indirection daha ekler.
-    ///   Düz field'lar daha doğrudan ve cache-friendly.
-    /// </summary>
-    private float _maxHp;
+    [Header("─── Düşman Stat'ları ───")]
+    [Tooltip("Düşmanın maksimum can puanı.\n" +
+             "Her spawn'da bu değere resetlenir.")]
+    [SerializeField]
+    private float _maxHp = 1f;
+
+    [Tooltip("Aşağı doğru hareket hızı (world units/saniye).\n" +
+             "Weak: 4, Medium: 2.8, Strong: 1.8 önerilir.")]
+    [SerializeField]
+    private float _speed = 3f;
+
+    [Tooltip("Yanal kayma hızı (mutlak değer, yön runtime'da atanır).\n" +
+             "Weak: 1.5, Medium: 1.0, Strong: 0.6 önerilir.")]
+    [SerializeField]
+    private float _driftSpeed = 1f;
+
+    [Tooltip("Öldürüldüğünde düşecek altın miktarı.")]
+    [SerializeField]
+    private int _goldValue = 1;
+
+    // ════════════════════════════════════════════════════════════════
+    //  RUNTIME STATE
+    // ════════════════════════════════════════════════════════════════
+
     private float _currentHp;
-    private float _speed;          // Aşağı doğru hareket hızı (world units/s)
-    private float _driftSpeed;     // Yanal kayma hızı (pozitif = sağa, negatif = sola)
-    private int   _goldValue;      // Öldürüldüğünde düşecek altın
+
+    /// <summary>
+    /// Runtime drift hızı (yönlü). Inspector'daki _driftSpeed mutlak değerdir.
+    /// Configure()'da spawn pozisyonuna göre yön atanır (pozitif = sağa).
+    /// </summary>
+    private float _currentDriftSpeed;
 
     // ════════════════════════════════════════════════════════════════
     //  POOL VE SINIR REFERANSLARI
     // ════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Bu düşmanın ait olduğu Object Pool referansı.
-    /// Bullet.cs ile aynı pattern — düşman kendi kendini iade eder.
-    /// </summary>
     private IObjectPool<Enemy> _ownerPool;
 
-    /// <summary>
-    /// Ekran sınırları (world coordinates).
-    /// EnemySpawner tarafından Configure() içinde set edilir.
-    /// 
-    /// Neden her düşman kendi hesaplamıyor?
-    /// → 30-40 düşman aynı anda aktif olabilir. Her biri Camera'ya
-    ///   erişip sınır hesaplasaydı 40 × ViewportToWorldPoint = 40 method call.
-    ///   Spawner bir kez hesaplayıp tüm düşmanlara dağıtması çok daha verimli.
-    /// </summary>
     private float _screenMinX;
     private float _screenMaxX;
-    private float _screenBottomY;  // Bu sınırın altına inince pool'a iade
+    private float _screenBottomY;
 
     // ════════════════════════════════════════════════════════════════
     //  CACHE
@@ -80,17 +82,12 @@ public class Enemy : MonoBehaviour
     private SpriteRenderer _cachedSpriteRenderer;
 
     /// <summary>
-    /// Sprite'ın yarı genişliği (world units).
-    /// Drift bounce hesabında ekran kenarından sprite'ın taşmaması için kullanılır.
-    /// Configure() içinde scale değiştiğinde güncellenir.
+    /// Sprite'ın world-space yarı genişliği.
+    /// Awake'te hesaplanır — prefab'ın kendi scale'i kullanılır,
+    /// kodla scale değiştirilmediği için bir kez hesaplamak yeterli.
     /// </summary>
     private float _spriteHalfWidth;
 
-    /// <summary>
-    /// Off-screen margin: Düşman ekranın ne kadar altına inince pool'a döner.
-    /// Çok küçük = düşman ekran kenarında aniden kaybolur (görsel olarak kötü).
-    /// 1.0 unit = düşman tamamen görünmez olduktan sonra iade edilir.
-    /// </summary>
     private const float OFF_SCREEN_MARGIN = 1.0f;
 
     // ════════════════════════════════════════════════════════════════
@@ -101,48 +98,55 @@ public class Enemy : MonoBehaviour
     {
         _cachedTransform      = transform;
         _cachedSpriteRenderer = GetComponent<SpriteRenderer>();
+
+        // ── Sprite yarı genişliğini hesapla (bir kez, Awake'te) ──
+        // Artık scale kodla değişmediği için Awake'te hesaplamak yeterli.
+        // Prefab'ın kendi localScale'i dikkate alınır.
+        if (_cachedSpriteRenderer != null && _cachedSpriteRenderer.sprite != null)
+        {
+            float localExtentX = _cachedSpriteRenderer.sprite.bounds.extents.x;
+            _spriteHalfWidth = localExtentX * Mathf.Abs(_cachedTransform.localScale.x);
+        }
+        else
+        {
+            _spriteHalfWidth = 0.5f;
+        }
     }
 
     /// <summary>
     /// Her frame: Aşağı hareket + yanal drift + sınır kontrolü.
-    /// Toplam maliyet: 2 float toplama, 2 float karşılaştırma, 1 position set.
     /// GC allocation: SIFIR.
     /// </summary>
     private void Update()
     {
         float dt = Time.deltaTime;
 
-        // ── Pozisyonu oku (bir kez — bridge call minimizasyonu) ──
         Vector3 pos = _cachedTransform.position;
 
         // ── Aşağı hareket ──
         pos.y -= _speed * dt;
 
         // ── Yanal drift ──
-        pos.x += _driftSpeed * dt;
+        pos.x += _currentDriftSpeed * dt;
 
-        // ── Drift bounce: Ekran kenarlarından sekme ──
-        // Sprite yarı genişliğini hesaba katarak kenar tespiti yapılır.
-        // Böylece düşmanın yarısı ekran dışına taşmaz.
+        // ── Drift bounce ──
         float leftBound  = _screenMinX + _spriteHalfWidth;
         float rightBound = _screenMaxX - _spriteHalfWidth;
 
         if (pos.x < leftBound)
         {
             pos.x = leftBound;
-            _driftSpeed = Mathf.Abs(_driftSpeed);   // Sağa yönlendir
+            _currentDriftSpeed = Mathf.Abs(_currentDriftSpeed);
         }
         else if (pos.x > rightBound)
         {
             pos.x = rightBound;
-            _driftSpeed = -Mathf.Abs(_driftSpeed);  // Sola yönlendir
+            _currentDriftSpeed = -Mathf.Abs(_currentDriftSpeed);
         }
 
-        // ── Pozisyonu uygula ──
         _cachedTransform.position = pos;
 
         // ── Ekran altı kontrolü ──
-        // Düşman ekranın altından tamamen çıktıysa pool'a iade et
         if (pos.y < _screenBottomY - OFF_SCREEN_MARGIN)
         {
             ReturnToPool();
@@ -154,25 +158,17 @@ public class Enemy : MonoBehaviour
     // ════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Pool'dan her alınışta çağrılır. Düşmanı seçilen tier'a göre konfigüre eder.
+    /// Pool'dan her alınışta çağrılır. Düşmanı spawn pozisyonuna
+    /// yerleştirir ve runtime state'ini başlatır.
     /// 
-    /// Neden her şey tek metotta?
-    /// → Pool'dan alınan bir düşman her seferinde farklı tier olabilir.
-    ///   Tüm stat'ları, görünümü ve sınırları atomik olarak set etmek
-    ///   yarı-konfigüre edilmiş obje riskini ortadan kaldırır.
+    /// Stat'lar (HP, speed, drift, gold) Inspector'dan gelir —
+    /// burada set edilmez. Sadece runtime state resetlenir.
     /// 
-    /// Configure çağrılmadan düşman aktif edilmemelidir.
-    /// Akış: pool.Get() → Configure() → SetActive(true) [pool callback]
+    /// Eski tier parametresi kaldırıldı: Her prefab kendi stat'larını
+    /// Inspector'da taşıyor, Configure'a stat geçmeye gerek yok.
     /// </summary>
-    /// <param name="pool">Bu düşmanın ait olduğu pool</param>
-    /// <param name="tier">Atanacak tier verileri</param>
-    /// <param name="spawnPos">Spawn pozisyonu (world)</param>
-    /// <param name="screenMinX">Ekran sol sınırı (world)</param>
-    /// <param name="screenMaxX">Ekran sağ sınırı (world)</param>
-    /// <param name="screenBottomY">Ekran alt sınırı (world)</param>
     public void Configure(
         IObjectPool<Enemy> pool,
-        EnemyTierData      tier,
         Vector3             spawnPos,
         float               screenMinX,
         float               screenMaxX,
@@ -184,39 +180,19 @@ public class Enemy : MonoBehaviour
         _screenMaxX    = screenMaxX;
         _screenBottomY = screenBottomY;
 
-        // ── Stat'ları ata ──
-        _maxHp     = tier.hp;
-        _currentHp = tier.hp;
-        _speed     = tier.speed;
-        _goldValue = tier.goldValue;
+        // ── HP'yi yenile (her spawn'da tam can) ──
+        _currentHp = _maxHp;
 
-        // ── Drift hızını rastgele ata ──
-        // Mutlak değer tier'dan gelir, yön spawn pozisyonuna göre belirlenir
-        // Sol yarıda spawn → sağa drift (pozitif)
-        // Sağ yarıda spawn → sola drift (negatif)
-        // Ortada spawn → rastgele yön
-        float midX = (_screenMinX + _screenMaxX) * 0.5f;
+        // ── Drift yönünü spawn pozisyonuna göre ata ──
+        // Sol yarıda → sağa drift (pozitif)
+        // Sağ yarıda → sola drift (negatif)
+        // Ortada → rastgele
+        float midX = (screenMinX + screenMaxX) * 0.5f;
         float signBias = spawnPos.x < midX - 0.5f ? 1f
                        : spawnPos.x > midX + 0.5f ? -1f
                        : (Random.value > 0.5f ? 1f : -1f);
 
-        _driftSpeed = tier.driftSpeed * signBias;
-
-        // ── Görünümü güncelle ──
-        _cachedTransform.localScale = tier.scale;
-        _cachedSpriteRenderer.color = tier.color;
-
-        // ── Sprite yarı genişliğini yeniden hesapla ──
-        // Scale değiştiği için extents de değişir
-        if (_cachedSpriteRenderer.sprite != null)
-        {
-            float localExtentX = _cachedSpriteRenderer.sprite.bounds.extents.x;
-            _spriteHalfWidth = localExtentX * Mathf.Abs(tier.scale.x);
-        }
-        else
-        {
-            _spriteHalfWidth = 0.5f * Mathf.Abs(tier.scale.x);
-        }
+        _currentDriftSpeed = _driftSpeed * signBias;
 
         // ── Pozisyonu set et ──
         _cachedTransform.position = spawnPos;
@@ -226,10 +202,6 @@ public class Enemy : MonoBehaviour
     //  POOL İADE
     // ════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Düşmanı pool'a iade eder.
-    /// Bullet.cs ile aynı double-release koruması: activeSelf kontrolü.
-    /// </summary>
     private void ReturnToPool()
     {
         if (!gameObject.activeSelf)
@@ -253,13 +225,6 @@ public class Enemy : MonoBehaviour
     //  PUBLIC API — Combat Sistemi İçin
     // ════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Düşmana hasar verir. Combat/Collision sistemi tarafından çağrılacak.
-    /// 
-    /// Dönüş değeri: true = düşman öldü, false = hâlâ hayatta.
-    /// Bu bilgi çağıran tarafta OnEnemyKilled event'ini tetiklemek,
-    /// gold drop oluşturmak vb. için kullanılacak.
-    /// </summary>
     public bool TakeDamage(float damage)
     {
         _currentHp -= damage;
@@ -268,64 +233,14 @@ public class Enemy : MonoBehaviour
         {
             _currentHp = 0f;
             ReturnToPool();
-            return true; // Öldü
+            return true;
         }
 
-        return false; // Hayatta
+        return false;
     }
 
-    /// <summary>Mevcut HP (UI veya HP bar için)</summary>
     public float CurrentHp => _currentHp;
-
-    /// <summary>Maksimum HP (HP bar doluluk oranı için: current/max)</summary>
-    public float MaxHp => _maxHp;
-
-    /// <summary>Öldürüldüğünde düşecek altın miktarı</summary>
-    public int GoldValue => _goldValue;
-
-    /// <summary>Düşman hâlâ hayatta mı?</summary>
-    public bool IsAlive => _currentHp > 0f;
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  TIER VERİ YAPISI
-// ════════════════════════════════════════════════════════════════════
-
-/// <summary>
-/// Düşman tier konfigürasyonunu taşıyan yapı.
-/// 
-/// Neden struct ve class değil?
-/// → Tier verileri değer tipidir — küçük, immutable, kısa ömürlü.
-///   Struct olarak stack'te yaşar, GC'ye yük bindirmez.
-///   EnemySpawner'da readonly array olarak tutulur.
-/// 
-/// Neden ScriptableObject değil (henüz)?
-/// → Şu an 3 tier var ve değerler kod içinde tanımlı.
-///   Prototip aşamasında bu yeterli. Production'da bu struct'ı
-///   ScriptableObject'e taşımak tek bir refactor:
-///     [CreateAssetMenu] public class EnemyTierSO : ScriptableObject { ... }
-///   Struct field'ları 1:1 aynı kalır.
-/// </summary>
-[System.Serializable]
-public struct EnemyTierData
-{
-    public string  name;       // Debug/log için ("Small", "Medium", "Large")
-    public float   hp;
-    public float   speed;      // Aşağı hareket hızı (world units/s)
-    public float   driftSpeed; // Yanal kayma hızı (mutlak değer, yön runtime'da atanır)
-    public int     goldValue;
-    public Vector3 scale;
-    public Color   color;
-
-    public EnemyTierData(string name, float hp, float speed, float driftSpeed,
-                         int goldValue, Vector3 scale, Color color)
-    {
-        this.name       = name;
-        this.hp         = hp;
-        this.speed      = speed;
-        this.driftSpeed = driftSpeed;
-        this.goldValue  = goldValue;
-        this.scale      = scale;
-        this.color      = color;
-    }
+    public float MaxHp     => _maxHp;
+    public int   GoldValue => _goldValue;
+    public bool  IsAlive   => _currentHp > 0f;
 }

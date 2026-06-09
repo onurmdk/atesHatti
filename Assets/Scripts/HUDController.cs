@@ -126,10 +126,10 @@ public class HUDController : MonoBehaviour
     /// </summary>
     private void SubscribeToEvents()
     {
-        // ── GoldManager → Altın text ──
+        // ── GoldManager → Altın text (Bu run'daki kazanç) ──
         if (GoldManager.Instance != null)
         {
-            GoldManager.Instance.OnGoldChanged += HandleGoldChanged;
+            GoldManager.Instance.OnRunGoldChanged += HandleGoldChanged;
         }
         else
         {
@@ -165,7 +165,7 @@ public class HUDController : MonoBehaviour
     private void UnsubscribeFromEvents()
     {
         if (GoldManager.Instance != null)
-            GoldManager.Instance.OnGoldChanged -= HandleGoldChanged;
+            GoldManager.Instance.OnRunGoldChanged -= HandleGoldChanged;
 
         if (_playerHealth != null)
             _playerHealth.OnHpChanged -= HandleHpChanged;
@@ -278,11 +278,8 @@ public class HUDController : MonoBehaviour
     /// </summary>
     private void InitializeUI()
     {
-        // ── Altın ──
-        int initialGold = GoldManager.Instance != null
-            ? GoldManager.Instance.CurrentGold
-            : 0;
-        HandleGoldChanged(initialGold);
+        // ── Altın (Bu run: her zaman 0'dan başlar) ──
+        HandleGoldChanged(0);
 
         // ── HP ──
         if (_playerHealth != null)

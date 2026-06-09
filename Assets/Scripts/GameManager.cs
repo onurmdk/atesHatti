@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using TMPro;
 using System;
 
 /// <summary>
@@ -153,6 +154,22 @@ public class GameManager : MonoBehaviour
     [SerializeField]
     private TMPro.TextMeshProUGUI _totalGoldText;
 
+    [Tooltip("Öldürülen düşman sayısını gösteren text.\n" +
+             "null bırakılabilir — yoksa atlanır.")]
+    [SerializeField]
+    private TMPro.TextMeshProUGUI _killsText;
+
+    [Header("─── Ana Menü Vitrin (UI) ───")]
+    [Tooltip("Ana Menüdeki toplam altın göstergesi.\n" +
+             "Rich Text: '<color=#FFC107>GOLD: 150</color>'")]
+    [SerializeField]
+    private TextMeshProUGUI _mainMenuTotalGoldText;
+
+    [Tooltip("Ana Menüdeki yüksek skor göstergesi.\n" +
+             "Rich Text: '<color=#00C2FF>HIGH SCORE: 2:35</color>'")]
+    [SerializeField]
+    private TextMeshProUGUI _mainMenuHighScoreText;
+
     [Header("─── Oyuncu Referansı ───")]
     [Tooltip("PlayerHealth bileşenine sahip Player objesi.")]
     [SerializeField]
@@ -170,6 +187,27 @@ public class GameManager : MonoBehaviour
     /// Bu sayede pause süresince süre ilerlermez.
     /// </summary>
     private float _elapsedTime;
+
+    /// <summary>Bu run'da öldürülen düşman sayısı.</summary>
+    private int _runKills;
+
+    /// <summary>
+    /// "Try Again" sonrası sahne yeniden yüklendiğinde oyunu
+    /// otomatik başlatmak için static flag.
+    /// 
+    /// Neden static?
+    /// → SceneManager.LoadScene tüm MonoBehaviour instance'larını yok eder.
+    ///   Instance field'lar sıfırlanır. Static field'lar sahne yüklemesinden
+    ///   etkilenmez — değer korunur.
+    /// 
+    /// Akış:
+    ///   RestartGame() → _autoStartGame = true → LoadScene
+    ///   → Awake (MainMenu) → Start → _autoStartGame true? → StartGame()
+    ///   
+    ///   ReturnToMainMenu() → _autoStartGame = false → LoadScene
+    ///   → Awake (MainMenu) → Start → _autoStartGame false? → menüde kal
+    /// </summary>
+    private static bool _autoStartGame = false;
 
     // ════════════════════════════════════════════════════════════════
     //  PUBLIC PROPERTIES
@@ -237,6 +275,23 @@ public class GameManager : MonoBehaviour
     private void Start()
     {
         SubscribeToEvents();
+
+        // ── Ana Menü vitrin bilgilerini güncelle ──
+        if (_currentState == GameState.MainMenu)
+        {
+            RefreshMainMenuUI();
+        }
+
+        // ── Auto-Start: "Try Again" sonrası otomatik oyun başlatma ──
+        // RestartGame() LoadScene öncesi _autoStartGame = true yapar.
+        // Sahne yeniden yüklenince Awake → MainMenu state.
+        // Start'ta flag kontrol edilir → true ise direkt StartGame().
+        // Oyuncu ana menüyü görmeden oyun başlar — "Try Again" hissi.
+        if (_autoStartGame)
+        {
+            _autoStartGame = false;
+            StartGame();
+        }
     }
 
     /// <summary>
@@ -276,6 +331,20 @@ public class GameManager : MonoBehaviour
                            "Game Over tetiklenemeyecek!", this);
             #endif
         }
+
+        // ── Kill tracking (Game Over istatistiği için) ──
+        if (CombatManager.Instance != null)
+        {
+            CombatManager.Instance.OnEnemyKilled += HandleEnemyKilledForStats;
+        }
+
+        // ── Ana Menü altın senkronizasyonu ──
+        // Mağazadan upgrade alındığında altın düşer → OnGoldChanged tetiklenir
+        // → HandleMenuGoldChanged → RefreshMainMenuUI() → vitrin güncellenir
+        if (GoldManager.Instance != null)
+        {
+            GoldManager.Instance.OnGoldChanged += HandleMenuGoldChanged;
+        }
     }
 
     private void UnsubscribeFromEvents()
@@ -283,6 +352,44 @@ public class GameManager : MonoBehaviour
         if (_playerHealth != null)
         {
             _playerHealth.OnPlayerDeath -= HandlePlayerDeath;
+        }
+
+        if (CombatManager.Instance != null)
+        {
+            CombatManager.Instance.OnEnemyKilled -= HandleEnemyKilledForStats;
+        }
+
+        if (GoldManager.Instance != null)
+        {
+            GoldManager.Instance.OnGoldChanged -= HandleMenuGoldChanged;
+        }
+    }
+
+    /// <summary>
+    /// Düşman öldürüldüğünde run kill sayacını artırır.
+    /// Game Over panelinde gösterilecek.
+    /// </summary>
+    private void HandleEnemyKilledForStats(int goldValue, Vector3 position)
+    {
+        _runKills++;
+    }
+
+    /// <summary>
+    /// GoldManager.OnGoldChanged event'i tarafından tetiklenir.
+    /// Sadece MainMenu state'indeyken vitrin UI'ını günceller.
+    /// 
+    /// Senaryo: Oyuncu ana menüdeyken mağazadan upgrade alır →
+    /// GoldManager altını düşürür → OnGoldChanged tetiklenir →
+    /// Bu handler çalışır → RefreshMainMenuUI() → "GOLD: 140" güncellenir.
+    /// 
+    /// Playing/GameOver state'lerinde çağrılsa bile guard kontrolü
+    /// ile gereksiz UI güncellemesi önlenir.
+    /// </summary>
+    private void HandleMenuGoldChanged(int newGold)
+    {
+        if (_currentState == GameState.MainMenu)
+        {
+            RefreshMainMenuUI();
         }
     }
 
@@ -321,6 +428,9 @@ public class GameManager : MonoBehaviour
 
         // ── State geçişi ──
         _currentState = GameState.Playing;
+
+        // ── Run istatistiklerini sıfırla ──
+        _runKills = 0;
 
         // ── Zamanı başlat ──
         Time.timeScale = 1f;
@@ -514,9 +624,10 @@ public class GameManager : MonoBehaviour
         // ── timeScale'i ÖNCE resetle ──
         Time.timeScale = 1f;
 
+        // ── Ana menüde kal, auto-start yapma ──
+        _autoStartGame = false;
+
         // ── Sahneyi yeniden yükle ──
-        // Awake çalışır → _currentState = MainMenu → timeScale = 0
-        // → MainMenuPanel açılır → tüm state temiz başlar
         int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
         SceneManager.LoadScene(currentSceneIndex);
     }
@@ -571,6 +682,18 @@ public class GameManager : MonoBehaviour
                   $"Altın: {(GoldManager.Instance != null ? GoldManager.Instance.TotalGoldEarned : 0)}");
         #endif
 
+        // ── Yüksek skor kontrolü ve kayıt ──
+        // timeScale = 0'dan ÖNCE yapılmalı (Save disk I/O yapıyor,
+        // timeScale bundan bağımsız ama mantıksal sıralama önemli).
+        if (SaveManager.Instance != null)
+        {
+            // TryUpdateHighScore: Mevcut süre > kayıtlı skor ise günceller + kaydeder.
+            // Eğer kayıtlı skor daha yüksekse hiçbir şey yapmaz (internal karşılaştırma).
+            SaveManager.Instance.TryUpdateHighScore(_elapsedTime);
+            SaveManager.Instance.IncrementGamesPlayed();
+            SaveManager.Instance.Save();
+        }
+
         // ── Zamanı durdur ──
         Time.timeScale = 0f;
 
@@ -591,18 +714,23 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // ── İstatistik metinlerini doldur ──
+        // ── İstatistik metinlerini doldur (prefix formatı) ──
         if (_survivalTimeText != null)
         {
-            _survivalTimeText.SetText(FormatTime(_elapsedTime));
+            _survivalTimeText.SetText("Time: " + FormatTime(_elapsedTime));
         }
 
         if (_totalGoldText != null)
         {
-            int totalGold = GoldManager.Instance != null
-                ? GoldManager.Instance.TotalGoldEarned
+            int runGold = GoldManager.Instance != null
+                ? GoldManager.Instance.CurrentRunGold
                 : 0;
-            _totalGoldText.SetText(totalGold.ToString());
+            _totalGoldText.SetText("Gold Earned: " + runGold.ToString());
+        }
+
+        if (_killsText != null)
+        {
+            _killsText.SetText("Kills: " + _runKills.ToString());
         }
 
         // ── Paneli aç ──
@@ -645,11 +773,55 @@ public class GameManager : MonoBehaviour
         // ── timeScale'i ÖNCE resetle ──
         Time.timeScale = 1f;
 
+        // ── Auto-start flag: Yeni sahne yüklenince direkt oyuna gir ──
+        _autoStartGame = true;
+
         // ── Sahneyi yeniden yükle ──
-        // GetActiveScene().buildIndex: Mevcut sahnenin build index'ini alır.
-        // Sahne adı hardcoded değil — sahne yeniden adlandırılsa bile çalışır.
         int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
         SceneManager.LoadScene(currentSceneIndex);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  ANA MENÜ VİTRİN GÜNCELLEMESİ
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Ana Menüdeki altın ve yüksek skor metinlerini SaveManager'dan
+    /// çekip Rich Text formatıyla günceller.
+    /// 
+    /// Çağrıldığı yerler:
+    ///   - Start() → Sahne ilk yüklendiğinde (MainMenu state)
+    ///   
+    /// Rich Text formatı:
+    ///   Gold:       &lt;color=#FFC107&gt;GOLD: 150&lt;/color&gt;
+    ///   High Score: &lt;color=#00C2FF&gt;HIGH SCORE: 2:35&lt;/color&gt;
+    /// </summary>
+    private void RefreshMainMenuUI()
+    {
+        // ── Toplam altın ──
+        if (_mainMenuTotalGoldText != null)
+        {
+            int gold = SaveManager.Instance != null
+                ? SaveManager.Instance.PersistentGold
+                : 0;
+
+            _mainMenuTotalGoldText.SetText(
+                "<color=#FFC107>GOLD: " + gold.ToString() + "</color>");
+        }
+
+        // ── Yüksek skor ──
+        if (_mainMenuHighScoreText != null)
+        {
+            float highScore = SaveManager.Instance != null
+                ? SaveManager.Instance.HighScore
+                : 0f;
+
+            // FormatTime ile dakika:saniye formatına çevir
+            string formattedScore = FormatTime(highScore);
+
+            _mainMenuHighScoreText.SetText(
+                "<color=#00C2FF>HIGH SCORE: " + formattedScore + "</color>");
+        }
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -705,5 +877,13 @@ public class GameManager : MonoBehaviour
         if (_pauseButtonHUD == null)
             Debug.LogWarning("[GameManager] PauseButtonHUD atanmamış — " +
                              "Duraklatma butonu gösterilmeyecek.", this);
+
+        if (_mainMenuTotalGoldText == null)
+            Debug.LogWarning("[GameManager] MainMenuTotalGoldText atanmamış — " +
+                             "Ana Menüde altın gösterilmeyecek.", this);
+
+        if (_mainMenuHighScoreText == null)
+            Debug.LogWarning("[GameManager] MainMenuHighScoreText atanmamış — " +
+                             "Ana Menüde yüksek skor gösterilmeyecek.", this);
     }
 }

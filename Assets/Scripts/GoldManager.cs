@@ -56,11 +56,31 @@ public class GoldManager : MonoBehaviour
     /// </summary>
     public event Action<int> OnGoldChanged;
 
+    /// <summary>
+    /// Mevcut RUN'da kazanılan altın değiştiğinde tetiklenir.
+    /// Parametre: Bu run'da kazanılan toplam altın.
+    /// HUDController bu event'i dinler — oyun içi "GOLD: X" göstergesi.
+    /// 
+    /// Neden OnGoldChanged'den ayrı?
+    /// → OnGoldChanged toplam (persistent) altını yansıtır.
+    ///   OnRunGoldChanged sadece bu oturumdaki kazancı yansıtır.
+    ///   HUD'da oyuncu "bu oyunda ne kazandım?" görmeli,
+    ///   "toplam birikimim ne?" değil.
+    /// </summary>
+    public event Action<int> OnRunGoldChanged;
+
     // ════════════════════════════════════════════════════════════════
     //  STATE
     // ════════════════════════════════════════════════════════════════
 
     private int _currentGold;
+
+    /// <summary>
+    /// Bu oturumda (run) kazanılan altın.
+    /// Her oyun başlangıcında sıfırlanır.
+    /// HUD göstergesi ve Game Over istatistiği için.
+    /// </summary>
+    private int _currentRunGold;
 
     /// <summary>
     /// Toplam kazanılan altın (oyun sonu istatistik için).
@@ -96,6 +116,22 @@ public class GoldManager : MonoBehaviour
     /// </summary>
     private void Start()
     {
+        // ── Kayıtlı altını yükle ──
+        // SaveManager.Awake'te JSON'dan veri okundu.
+        // Start tüm Awake'lerden sonra çağrılır → SaveManager.Instance hazır.
+        // Bu sayede oyuncu önceki oturumdan kalan altınıyla başlar.
+        if (SaveManager.Instance != null)
+        {
+            _currentGold = SaveManager.Instance.PersistentGold;
+
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log($"[GoldManager] Kayıtlı altın yüklendi: {_currentGold}");
+            #endif
+
+            // UI'ın başlangıç değerini alması için event tetikle
+            OnGoldChanged?.Invoke(_currentGold);
+        }
+
         SubscribeToCombatEvents();
     }
 
@@ -172,8 +208,13 @@ public class GoldManager : MonoBehaviour
 
         _currentGold     += amount;
         _totalGoldEarned += amount;
+        _currentRunGold  += amount;
+
+        // ── Kalıcı kayıt: Altını JSON'a yaz ──
+        PersistCurrentGold();
 
         OnGoldChanged?.Invoke(_currentGold);
+        OnRunGoldChanged?.Invoke(_currentRunGold);
     }
 
     /// <summary>
@@ -192,8 +233,30 @@ public class GoldManager : MonoBehaviour
 
         _currentGold -= amount;
 
+        // ── Kalıcı kayıt: Altını JSON'a yaz ──
+        PersistCurrentGold();
+
         OnGoldChanged?.Invoke(_currentGold);
         return true;
+    }
+
+    /// <summary>
+    /// Mevcut altını SaveManager'a aktarıp disk'e yazar.
+    /// AddGold ve TrySpendGold'dan çağrılır — DRY prensibi.
+    /// 
+    /// Neden her değişiklikte kaydediyoruz?
+    /// → Mobilde uygulama her an öldürülebilir.
+    ///   Kaydetmezsek oyuncu 50 altın kazanıp tab değiştirirse
+    ///   o altınlar kaybolur. Her değişiklikte kaydetmek güvenli.
+    ///   Maliyet: ~0.1ms — saniyede 3-4 düşman ölse bile kabul edilebilir.
+    /// </summary>
+    private void PersistCurrentGold()
+    {
+        if (SaveManager.Instance != null)
+        {
+            SaveManager.Instance.SetPersistentGold(_currentGold);
+            SaveManager.Instance.Save();
+        }
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -202,6 +265,9 @@ public class GoldManager : MonoBehaviour
 
     /// <summary>Mevcut altın miktarı.</summary>
     public int CurrentGold => _currentGold;
+
+    /// <summary>Bu run'da kazanılan altın (HUD ve Game Over için).</summary>
+    public int CurrentRunGold => _currentRunGold;
 
     /// <summary>Toplam kazanılan altın (game over istatistiği için).</summary>
     public int TotalGoldEarned => _totalGoldEarned;
@@ -216,7 +282,9 @@ public class GoldManager : MonoBehaviour
     {
         _currentGold     = 0;
         _totalGoldEarned = 0;
+        _currentRunGold  = 0;
 
         OnGoldChanged?.Invoke(_currentGold);
+        OnRunGoldChanged?.Invoke(0);
     }
 }
