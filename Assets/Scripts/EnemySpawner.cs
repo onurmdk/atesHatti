@@ -80,6 +80,19 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField, Range(0.5f, 3f)]
     private float _spawnOffsetAboveScreen = 1.2f;
 
+    [Header("─── Boss Sistemi ───")]
+    [Tooltip("Boss prefab'ı. Inspector'dan sürükle.")]
+    [SerializeField]
+    private Boss _bossPrefab;
+
+    [Tooltip("İlk boss'un gelme süresi (saniye).")]
+    [SerializeField, Range(20f, 120f)]
+    private float _bossInterval = 45f;
+
+    [Tooltip("Boss'un ekranın üstünden inip duracağı Y noktası.")]
+    [SerializeField]
+    private float _bossStopY = 3.5f;
+
     // ════════════════════════════════════════════════════════════════
     //  CDF — Tier Ağırlık Dağılımı (KORUNDU)
     // ════════════════════════════════════════════════════════════════
@@ -130,6 +143,12 @@ public class EnemySpawner : MonoBehaviour
     // ── Spawn kontrolü ──
     private bool _isSpawningEnabled = true;
 
+    // ── Boss Fight State ──
+    private float _bossTimer;
+    private int   _currentBossLevel;
+    private Boss  _activeBoss;
+    private bool  _isBossFightActive;
+
     // ════════════════════════════════════════════════════════════════
     //  UNITY LIFECYCLE
     // ════════════════════════════════════════════════════════════════
@@ -148,6 +167,12 @@ public class EnemySpawner : MonoBehaviour
         _spawnTimer           = _currentSpawnInterval;
         _difficultyTimer      = 0f;
         _difficultyLevel      = 0;
+
+        // Boss state
+        _bossTimer         = 0f;
+        _currentBossLevel  = 0;
+        _isBossFightActive = false;
+        _activeBoss        = null;
     }
 
     private void Update()
@@ -155,10 +180,20 @@ public class EnemySpawner : MonoBehaviour
         if (!_isSpawningEnabled) return;
 
         float dt = Time.deltaTime;
-
         RefreshBoundsIfChanged();
+
+        // ── Boss Fight aktifken: Normal spawn ve zorluk DURUR ──
+        // Sadece boss'un ölüp ölmediğini kontrol et
+        if (_isBossFightActive)
+        {
+            CheckBossStatus();
+            return;
+        }
+
+        // ── Normal akış: Zorluk + Spawn + Boss Timer ──
         UpdateDifficultyScaling(dt);
         UpdateSpawnTimer(dt);
+        UpdateBossTimer(dt);
     }
 
     private void OnDestroy()
@@ -401,6 +436,98 @@ public class EnemySpawner : MonoBehaviour
     }
 
     // ════════════════════════════════════════════════════════════════
+    //  BOSS SİSTEMİ
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Boss spawn timer'ını günceller.
+    /// _bossInterval saniyeye ulaşınca boss'u spawn eder.
+    /// </summary>
+    private void UpdateBossTimer(float dt)
+    {
+        _bossTimer += dt;
+
+        if (_bossTimer >= _bossInterval)
+        {
+            _bossTimer = 0f;
+            SpawnBoss();
+        }
+    }
+
+    /// <summary>
+    /// Boss'u oluşturur ve konfigüre eder.
+    /// 
+    /// Akış:
+    /// 1. isBossFightActive = true → normal spawn + zorluk DURUR
+    /// 2. "Player" tag ile oyuncuyu bul
+    /// 3. Boss'u Instantiate et
+    /// 4. Configure(level, bounds, stopY, player) ile başlat
+    /// </summary>
+    private void SpawnBoss()
+    {
+        if (_bossPrefab == null)
+        {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.LogError("[EnemySpawner] Boss prefab atanmamış!", this);
+            #endif
+            return;
+        }
+
+        // ── Normal akışı durdur ──
+        _isBossFightActive = true;
+
+        // ── Oyuncuyu bul ──
+        Transform playerTransform = null;
+        GameObject playerObj = GameObject.FindWithTag("Player");
+        if (playerObj != null)
+        {
+            playerTransform = playerObj.transform;
+        }
+
+        // ── Boss'u oluştur ──
+        _activeBoss = Instantiate(_bossPrefab);
+        _activeBoss.Configure(
+            _currentBossLevel,
+            _screenMinX,
+            _screenMaxX,
+            _bossStopY,
+            playerTransform
+        );
+
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        Debug.Log($"[EnemySpawner] BOSS SPAWNED! Level: {_currentBossLevel}");
+        #endif
+    }
+
+    /// <summary>
+    /// Boss fight sırasında boss'un durumunu kontrol eder.
+    /// Boss öldüyse (Destroy olmuş → null) veya IsAlive false ise:
+    ///   - Boss fight'ı bitir
+    ///   - Boss level'ını artır
+    ///   - Normal akışa devam et (zorluk kaldığı yerden)
+    ///   - Oyuncuya kısa nefes molası ver
+    /// </summary>
+    private void CheckBossStatus()
+    {
+        // Unity'de Destroy edilen obje null döner (== operator override)
+        if (_activeBoss == null)
+        {
+            // ── Boss öldü → normal akışa dön ──
+            _isBossFightActive = false;
+            _currentBossLevel++;
+            _bossTimer = 0f;
+
+            // Oyuncuya kısa nefes molası: Spawn timer'ı resetle
+            // Böylece boss ölür ölmez düşman yağmuru başlamaz
+            _spawnTimer = _currentSpawnInterval;
+
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log($"[EnemySpawner] Boss defeated! Next boss level: {_currentBossLevel}");
+            #endif
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
     //  EKRAN SINIRI HESAPLAMASI (KORUNDU)
     // ════════════════════════════════════════════════════════════════
 
@@ -460,6 +587,9 @@ public class EnemySpawner : MonoBehaviour
     public bool  IsSpawningEnabled    => _isSpawningEnabled;
     public int   DifficultyLevel      => _difficultyLevel;
     public float CurrentSpawnInterval => _currentSpawnInterval;
+    public bool  IsBossFightActive    => _isBossFightActive;
+    public int   CurrentBossLevel     => _currentBossLevel;
+    public Boss  ActiveBoss           => _activeBoss;
 
     public void ResetDifficulty()
     {
@@ -468,6 +598,12 @@ public class EnemySpawner : MonoBehaviour
         _currentSpawnInterval = _baseSpawnInterval;
         _spawnTimer           = _baseSpawnInterval;
         _isSpawningEnabled    = true;
+
+        // Boss state reset
+        _bossTimer         = 0f;
+        _currentBossLevel  = 0;
+        _isBossFightActive = false;
+        _activeBoss        = null;
 
         RecalculateTierWeights();
     }
@@ -490,6 +626,10 @@ public class EnemySpawner : MonoBehaviour
 
         if (_mainCamera == null)
             Debug.LogError("[EnemySpawner] MainCamera bulunamadı!", this);
+
+        if (_bossPrefab == null)
+            Debug.LogWarning("[EnemySpawner] Boss prefab atanmamış — " +
+                             "Boss fight çalışmayacak.", this);
 
         if (_enemyPrefabs != null)
         {
