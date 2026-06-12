@@ -1,44 +1,8 @@
 using UnityEngine;
 using UnityEngine.Pool;
 
-/// <summary>
-/// ╔══════════════════════════════════════════════════════════════════╗
-///   ATEŞ HATTI — EnemySpawner (Düşman Dalga Yöneticisi)
-///   
-///   Ekranın üstünden düşman spawn eden, zorluk skalalaması yapan,
-///   CDF ile tier seçen ve Multi-Pool ile bellek yöneten merkezi spawner.
-/// ╚══════════════════════════════════════════════════════════════════╝
-/// 
-/// Multi-Prefab — Multi-Pool Mimari:
-/// ──────────────────────────────────
-///   Inspector'dan 3 farklı prefab atanır: [Weak, Medium, Strong]
-///   Her prefab için ayrı ObjectPool oluşturulur.
-///   CDF ile tier index seçilir → ilgili pool'dan Get → Configure → SetActive.
-/// 
-///   _enemyPrefabs[0] → _enemyPools[0]  (Weak)
-///   _enemyPrefabs[1] → _enemyPools[1]  (Medium)
-///   _enemyPrefabs[2] → _enemyPools[2]  (Strong)
-/// 
-/// Zorluk Skalalaması (KORUNDU):
-/// ─────────────────────────────
-///   Her _difficultyInterval saniyede:
-///     1. Spawn aralığı *= _difficultyMultiplier (min: _minSpawnInterval)
-///     2. Büyük düşman CDF ağırlığı artar
-///   Çift katmanlı artış = exponential zorluk eğrisi
-/// 
-/// Performans:
-/// ───────────
-/// • Update'te SIFIR GC allocation
-/// • Ekran sınırları dirty-check ile sadece değişince hesaplanır
-/// • CDF: 2 branch, O(1), allocation yok
-/// • Pre-warm: Her pool ayrı ayrı ısıtılır
-/// </summary>
 public class EnemySpawner : MonoBehaviour
 {
-    // ════════════════════════════════════════════════════════════════
-    //  INSPECTOR — Prefab ve Pool Ayarları
-    // ════════════════════════════════════════════════════════════════
-
     [Header("─── Düşman Prefab'ları ───")]
     [Tooltip("3 elemanlı dizi: [0]=Weak, [1]=Medium, [2]=Strong.\n" +
              "Her prefab kendi stat'larını (HP, speed, drift, gold)\n" +
@@ -93,65 +57,33 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField]
     private float _bossStopY = 3.5f;
 
-    // ════════════════════════════════════════════════════════════════
-    //  CDF — Tier Ağırlık Dağılımı (KORUNDU)
-    // ════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Başlangıç ağırlıkları: Weak %60, Medium %25, Strong %15
-    /// Zorluk arttıkça güçlü düşmanların oranı yükselir.
-    /// </summary>
     private readonly float[] _baseTierWeights = { 0.60f, 0.25f, 0.15f };
     private readonly float[] _currentTierCDF  = new float[3];
 
-    // ════════════════════════════════════════════════════════════════
-    //  MULTI-POOL SİSTEMİ
-    // ════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Her prefab için ayrı ObjectPool.
-    /// _enemyPools[0] → Weak pool
-    /// _enemyPools[1] → Medium pool
-    /// _enemyPools[2] → Strong pool
-    /// 
-    /// Neden tek pool değil?
-    /// → Tek pool'da tüm prefab'lar karışır. Get() ile Weak istiyorsun
-    ///   ama pool'dan Strong çıkabilir — kontrol yok.
-    ///   Ayrı pool'larla hangi tier'ı istiyorsak o pool'dan çekeriz.
-    /// </summary>
     private ObjectPool<Enemy>[] _enemyPools;
     private Transform           _enemyContainer;
 
-    // ── Timer'lar ──
     private float _spawnTimer;
     private float _currentSpawnInterval;
     private float _difficultyTimer;
     private int   _difficultyLevel;
 
-    // ── Ekran sınırları ──
     private Camera _mainCamera;
     private float  _screenMinX;
     private float  _screenMaxX;
     private float  _screenTopY;
     private float  _screenBottomY;
 
-    // Dirty check
     private float _prevScreenW;
     private float _prevScreenH;
     private float _prevOrthoSize;
 
-    // ── Spawn kontrolü ──
     private bool _isSpawningEnabled = true;
 
-    // ── Boss Fight State ──
     private float _bossTimer;
     private int   _currentBossLevel;
     private Boss  _activeBoss;
     private bool  _isBossFightActive;
-
-    // ════════════════════════════════════════════════════════════════
-    //  UNITY LIFECYCLE
-    // ════════════════════════════════════════════════════════════════
 
     private void Awake()
     {
@@ -168,7 +100,6 @@ public class EnemySpawner : MonoBehaviour
         _difficultyTimer      = 0f;
         _difficultyLevel      = 0;
 
-        // Boss state
         _bossTimer         = 0f;
         _currentBossLevel  = 0;
         _isBossFightActive = false;
@@ -182,15 +113,12 @@ public class EnemySpawner : MonoBehaviour
         float dt = Time.deltaTime;
         RefreshBoundsIfChanged();
 
-        // ── Boss Fight aktifken: Normal spawn ve zorluk DURUR ──
-        // Sadece boss'un ölüp ölmediğini kontrol et
         if (_isBossFightActive)
         {
             CheckBossStatus();
             return;
         }
 
-        // ── Normal akış: Zorluk + Spawn + Boss Timer ──
         UpdateDifficultyScaling(dt);
         UpdateSpawnTimer(dt);
         UpdateBossTimer(dt);
@@ -198,7 +126,6 @@ public class EnemySpawner : MonoBehaviour
 
     private void OnDestroy()
     {
-        // Tüm pool'ları temizle
         if (_enemyPools != null)
         {
             for (int i = 0; i < _enemyPools.Length; i++)
@@ -208,17 +135,6 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
-    // ════════════════════════════════════════════════════════════════
-    //  MULTI-POOL BAŞLATMA
-    // ════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Her prefab için ayrı ObjectPool oluşturur ve pre-warm yapar.
-    /// 
-    /// Closure pattern: Her pool kendi prefab index'ini closure ile yakalar.
-    /// Lambda içindeki `prefabIndex` değişkeni döngü bitince de doğru
-    /// değeri tutar — C# closure semantiği bunu garanti eder.
-    /// </summary>
     private void InitializePools()
     {
         int prefabCount = _enemyPrefabs.Length;
@@ -226,7 +142,6 @@ public class EnemySpawner : MonoBehaviour
 
         for (int i = 0; i < prefabCount; i++)
         {
-            // Closure için local copy — döngü değişkeni doğrudan capture edilmez
             int prefabIndex = i;
 
             _enemyPools[i] = new ObjectPool<Enemy>(
@@ -239,15 +154,10 @@ public class EnemySpawner : MonoBehaviour
                 maxSize:         _poolMaxSize
             );
 
-            // Pre-warm: Bu pool'u başlangıçta doldur
             PreWarmSinglePool(_enemyPools[i]);
         }
     }
 
-    /// <summary>
-    /// Tek bir pool'u pre-warm eder.
-    /// Get → Release döngüsü ile _poolDefaultCapacity kadar obje oluşturulur.
-    /// </summary>
     private void PreWarmSinglePool(ObjectPool<Enemy> pool)
     {
         Enemy[] temp = new Enemy[_poolDefaultCapacity];
@@ -259,12 +169,6 @@ public class EnemySpawner : MonoBehaviour
             pool.Release(temp[i]);
     }
 
-    // ── Pool Callback'leri ──
-
-    /// <summary>
-    /// Belirtilen prefab index'inden yeni düşman oluşturur.
-    /// Her pool kendi prefab'ını closure ile bilir.
-    /// </summary>
     private Enemy OnPoolCreate(int prefabIndex)
     {
         Enemy enemy = Instantiate(_enemyPrefabs[prefabIndex], _enemyContainer);
@@ -273,7 +177,6 @@ public class EnemySpawner : MonoBehaviour
 
     private void OnPoolGet(Enemy enemy)
     {
-        // SetActive burada yapılmıyor — SpawnEnemy'de Configure'dan sonra
     }
 
     private void OnPoolRelease(Enemy enemy)
@@ -286,10 +189,6 @@ public class EnemySpawner : MonoBehaviour
         if (enemy != null)
             Destroy(enemy.gameObject);
     }
-
-    // ════════════════════════════════════════════════════════════════
-    //  SPAWN ZAMANLAMA (KORUNDU)
-    // ════════════════════════════════════════════════════════════════
 
     private void UpdateSpawnTimer(float dt)
     {
@@ -306,17 +205,6 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
-    // ════════════════════════════════════════════════════════════════
-    //  ZORLUK SKALAMASI (KORUNDU — BİREBİR AYNI MATEMATİK)
-    // ════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// İki katmanlı zorluk artışı:
-    /// 1. Spawn aralığı azalır → daha fazla düşman
-    /// 2. Güçlü düşman CDF ağırlığı artar → daha fazla toplam HP
-    /// 
-    /// Spawn aralığı _minSpawnInterval altına düşemez (Mathf.Max garantisi).
-    /// </summary>
     private void UpdateDifficultyScaling(float dt)
     {
         _difficultyTimer += dt;
@@ -326,11 +214,9 @@ public class EnemySpawner : MonoBehaviour
             _difficultyTimer -= _difficultyInterval;
             _difficultyLevel++;
 
-            // ── Spawn aralığını azalt (minimum sınırla) ──
             _currentSpawnInterval *= _difficultyMultiplier;
             _currentSpawnInterval = Mathf.Max(_currentSpawnInterval, _minSpawnInterval);
 
-            // ── Tier ağırlıklarını güncelle ──
             RecalculateTierWeights();
 
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -341,15 +227,6 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// CDF ağırlık hesabı (KORUNDU — birebir aynı formül).
-    /// 
-    /// Her zorluk seviyesinde:
-    ///   - Weak ağırlığı %3 düşer (min %25)
-    ///   - Medium %1 artar
-    ///   - Strong %2 artar (max %35)
-    ///   - Normalize edilir (toplam = 1.0)
-    /// </summary>
     private void RecalculateTierWeights()
     {
         float smallW  = Mathf.Max(0.25f, _baseTierWeights[0] - _difficultyLevel * 0.03f);
@@ -365,34 +242,15 @@ public class EnemySpawner : MonoBehaviour
         _currentTierCDF[2] = 1.0f;
     }
 
-    // ════════════════════════════════════════════════════════════════
-    //  DÜŞMAN SPAWN (Multi-Pool Versiyonu)
-    // ════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// CDF ile tier seçer, ilgili pool'dan düşman alır, konfigüre eder.
-    /// 
-    /// Akış:
-    /// 1. SelectTierIndex() → CDF ile 0/1/2 index belirle
-    /// 2. _enemyPools[index].Get() → ilgili pool'dan düşman al
-    /// 3. Spawn pozisyonu hesapla (prefab'ın kendi sprite genişliğiyle)
-    /// 4. Configure() → pool ref + pozisyon + sınırlar
-    /// 5. SetActive(true)
-    /// </summary>
     private void SpawnEnemy()
     {
-        // ── Tier seç (CDF — korunmuş matematik) ──
         int tierIndex = SelectTierIndex();
 
-        // ── Güvenlik: Index prefab array sınırları içinde mi? ──
         if (tierIndex < 0 || tierIndex >= _enemyPools.Length)
             return;
 
-        // ── İlgili pool'dan düşman al ──
         Enemy enemy = _enemyPools[tierIndex].Get();
 
-        // ── Spawn pozisyonu ──
-        // Prefab'ın kendi SpriteRenderer'ından genişlik oku
         SpriteRenderer sr = enemy.GetComponent<SpriteRenderer>();
         float spriteHalfW = 0.5f;
         if (sr != null && sr.sprite != null)
@@ -405,7 +263,6 @@ public class EnemySpawner : MonoBehaviour
 
         Vector3 spawnPos = new Vector3(spawnX, spawnY, 0f);
 
-        // ── Konfigüre et (yeni imza — tier parametresi yok) ──
         enemy.Configure(
             pool:          _enemyPools[tierIndex],
             spawnPos:      spawnPos,
@@ -414,35 +271,18 @@ public class EnemySpawner : MonoBehaviour
             screenBottomY: _screenBottomY
         );
 
-        // ── Aktif et ──
         enemy.gameObject.SetActive(true);
     }
 
-    /// <summary>
-    /// CDF ile tier index seçer (KORUNDU — birebir aynı mantık).
-    /// 
-    /// CDF = [0.60, 0.85, 1.00]:
-    ///   roll < 0.60 → 0 (Weak)
-    ///   roll < 0.85 → 1 (Medium)
-    ///   else        → 2 (Strong)
-    /// </summary>
     private int SelectTierIndex()
     {
         float roll = Random.value;
 
-        if (roll < _currentTierCDF[0]) return 0;  // Weak
-        if (roll < _currentTierCDF[1]) return 1;  // Medium
-        return 2;                                   // Strong
+        if (roll < _currentTierCDF[0]) return 0;
+        if (roll < _currentTierCDF[1]) return 1;
+        return 2;
     }
 
-    // ════════════════════════════════════════════════════════════════
-    //  BOSS SİSTEMİ
-    // ════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Boss spawn timer'ını günceller.
-    /// _bossInterval saniyeye ulaşınca boss'u spawn eder.
-    /// </summary>
     private void UpdateBossTimer(float dt)
     {
         _bossTimer += dt;
@@ -454,15 +294,6 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Boss'u oluşturur ve konfigüre eder.
-    /// 
-    /// Akış:
-    /// 1. isBossFightActive = true → normal spawn + zorluk DURUR
-    /// 2. "Player" tag ile oyuncuyu bul
-    /// 3. Boss'u Instantiate et
-    /// 4. Configure(level, bounds, stopY, player) ile başlat
-    /// </summary>
     private void SpawnBoss()
     {
         if (_bossPrefab == null)
@@ -473,10 +304,8 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
-        // ── Normal akışı durdur ──
         _isBossFightActive = true;
 
-        // ── Oyuncuyu bul ──
         Transform playerTransform = null;
         GameObject playerObj = GameObject.FindWithTag("Player");
         if (playerObj != null)
@@ -484,7 +313,6 @@ public class EnemySpawner : MonoBehaviour
             playerTransform = playerObj.transform;
         }
 
-        // ── Boss'u oluştur ──
         _activeBoss = Instantiate(_bossPrefab);
         _activeBoss.Configure(
             _currentBossLevel,
@@ -499,26 +327,14 @@ public class EnemySpawner : MonoBehaviour
         #endif
     }
 
-    /// <summary>
-    /// Boss fight sırasında boss'un durumunu kontrol eder.
-    /// Boss öldüyse (Destroy olmuş → null) veya IsAlive false ise:
-    ///   - Boss fight'ı bitir
-    ///   - Boss level'ını artır
-    ///   - Normal akışa devam et (zorluk kaldığı yerden)
-    ///   - Oyuncuya kısa nefes molası ver
-    /// </summary>
     private void CheckBossStatus()
     {
-        // Unity'de Destroy edilen obje null döner (== operator override)
         if (_activeBoss == null)
         {
-            // ── Boss öldü → normal akışa dön ──
             _isBossFightActive = false;
             _currentBossLevel++;
             _bossTimer = 0f;
 
-            // Oyuncuya kısa nefes molası: Spawn timer'ı resetle
-            // Böylece boss ölür ölmez düşman yağmuru başlamaz
             _spawnTimer = _currentSpawnInterval;
 
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -526,10 +342,6 @@ public class EnemySpawner : MonoBehaviour
             #endif
         }
     }
-
-    // ════════════════════════════════════════════════════════════════
-    //  EKRAN SINIRI HESAPLAMASI (KORUNDU)
-    // ════════════════════════════════════════════════════════════════
 
     private void RefreshBoundsIfChanged()
     {
@@ -560,19 +372,11 @@ public class EnemySpawner : MonoBehaviour
         _prevOrthoSize = _mainCamera.orthographicSize;
     }
 
-    // ════════════════════════════════════════════════════════════════
-    //  HIERARCHY YÖNETİMİ
-    // ════════════════════════════════════════════════════════════════
-
     private void CreateEnemyContainer()
     {
         GameObject container = new GameObject("── Enemy Pool ──");
         _enemyContainer = container.transform;
     }
-
-    // ════════════════════════════════════════════════════════════════
-    //  PUBLIC API (KORUNDU)
-    // ════════════════════════════════════════════════════════════════
 
     public void SetSpawningEnabled(bool enabled)
     {
@@ -599,7 +403,6 @@ public class EnemySpawner : MonoBehaviour
         _spawnTimer           = _baseSpawnInterval;
         _isSpawningEnabled    = true;
 
-        // Boss state reset
         _bossTimer         = 0f;
         _currentBossLevel  = 0;
         _isBossFightActive = false;
@@ -607,10 +410,6 @@ public class EnemySpawner : MonoBehaviour
 
         RecalculateTierWeights();
     }
-
-    // ════════════════════════════════════════════════════════════════
-    //  DOĞRULAMA
-    // ════════════════════════════════════════════════════════════════
 
     [System.Diagnostics.Conditional("UNITY_EDITOR"),
      System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
@@ -640,10 +439,6 @@ public class EnemySpawner : MonoBehaviour
             }
         }
     }
-
-    // ════════════════════════════════════════════════════════════════
-    //  EDITOR GIZMOS (KORUNDU)
-    // ════════════════════════════════════════════════════════════════
 
     #if UNITY_EDITOR
     private void OnDrawGizmos()
