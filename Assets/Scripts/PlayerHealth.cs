@@ -115,10 +115,14 @@ public class PlayerHealth : MonoBehaviour
     public void UpgradeMaxHp(float newMaxHp)
     {
         float diff = newMaxHp - _maxHp;
-        _maxHp = newMaxHp;
+        _maxHp = Mathf.Max(1f, newMaxHp);
 
         if (diff > 0f)
-            _currentHp = Mathf.Min(_maxHp, _currentHp + diff);
+            _currentHp += diff;
+
+        // Always clamp: max HP can go down as well as up, and current HP
+        // must never exceed it.
+        _currentHp = Mathf.Clamp(_currentHp, 0f, _maxHp);
 
         OnHpChanged?.Invoke(_currentHp, _maxHp);
     }

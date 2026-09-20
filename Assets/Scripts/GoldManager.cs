@@ -106,13 +106,13 @@ public class GoldManager : MonoBehaviour
 
     private void PersistCurrentGold()
     {
-        if (SaveManager.Instance != null)
-        {
-            SaveManager.Instance.SetPersistentGold(_currentGold);
-            SaveManager.Instance.Save();
-        }
-    }
+        if (SaveManager.Instance == null) return;
 
+        // Update memory and mark dirty only. SaveManager flushes on autosave,
+        // pause, game over and quit. Writing here would hit PlayerPrefs on every
+        // kill, and on WebGL that is a synchronous IndexedDB flush.
+        SaveManager.Instance.SetPersistentGold(_currentGold);
+    }
     public int CurrentGold => _currentGold;
 
     public int CurrentRunGold => _currentRunGold;

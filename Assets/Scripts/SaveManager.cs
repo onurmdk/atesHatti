@@ -22,6 +22,9 @@ public class SaveManager : MonoBehaviour
     }
 
     private const string SAVE_KEY = "ates_hatti_save_v1";
+    private const float AUTOSAVE_INTERVAL = 15f;
+
+    private bool _isDirty;
 
     private PlayerSaveData _data;
 
@@ -40,7 +43,35 @@ public class SaveManager : MonoBehaviour
 
         Load();
     }
+        private void Start()
+    {
+        StartCoroutine(AutoSaveRoutine());
+    }
 
+    private System.Collections.IEnumerator AutoSaveRoutine()
+    {
+        // Realtime, not scaled time: Time.timeScale is 0 in menus and while paused.
+        var wait = new WaitForSecondsRealtime(AUTOSAVE_INTERVAL);
+
+        while (true)
+        {
+            yield return wait;
+            SaveIfDirty();
+        }
+    }
+
+    /// <summary>Flags in-memory data as changed without touching disk.</summary>
+    public void MarkDirty()
+    {
+        _isDirty = true;
+    }
+
+    /// <summary>Writes to disk only if something actually changed.</summary>
+    public void SaveIfDirty()
+    {
+        if (_isDirty)
+            Save();
+    }
     private void OnDestroy()
     {
         if (Instance == this)
@@ -106,7 +137,7 @@ public class SaveManager : MonoBehaviour
         string json = JsonUtility.ToJson(_data);
         PlayerPrefs.SetString(SAVE_KEY, json);
         PlayerPrefs.Save();
-
+        _isDirty = false;
         OnDataSaved?.Invoke();
 
         #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -134,6 +165,7 @@ public class SaveManager : MonoBehaviour
     public void IncrementGamesPlayed()
     {
         _data.totalGamesPlayed++;
+        MarkDirty();
     }
 
     public int   FireRateLevel    => _data.fireRateLevel;
@@ -151,6 +183,7 @@ public class SaveManager : MonoBehaviour
             case UpgradeType.Damage:   _data.damageLevel++;   break;
             case UpgradeType.MaxHP:    _data.maxHpLevel++;    break;
         }
+        MarkDirty();
     }
 
     public int GetUpgradeLevel(UpgradeType type)
@@ -167,6 +200,7 @@ public class SaveManager : MonoBehaviour
     public void SetPersistentGold(int gold)
     {
         _data.persistentGold = Mathf.Max(0, gold);
+        MarkDirty();
     }
 
     [ContextMenu("Tüm Save Verisini Sil")]

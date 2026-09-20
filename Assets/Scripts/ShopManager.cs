@@ -33,18 +33,18 @@ public class ShopManager : MonoBehaviour
     {
         new UpgradeConfig(UpgradeType.FireRate, 10,  1.6f, 8,  "FIRE RATE", "#00C2FF"),
         new UpgradeConfig(UpgradeType.Damage,   20,  1.5f, 10, "DAMAGE",    "#FF6B6B"),
-        new UpgradeConfig(UpgradeType.MaxHP,    15,  1.5f, 8,  "MAX HP",    "#2ED573"),
+        new UpgradeConfig(UpgradeType.MaxHP,    15,  1.5f, 7,  "MAX HP",    "#2ED573"),
     };
 
     private const float BASE_FIRE_INTERVAL = 0.65f;
-    private const float MIN_FIRE_INTERVAL  = 0.08f;
-    private const float FIRE_RATE_PER_LVL  = -0.025f;
+    private const float MIN_FIRE_INTERVAL = 0.08f;
+    private const float FIRE_RATE_PER_LVL = -0.025f;
 
-    private const float BASE_DAMAGE        = 1f;
-    private const float DAMAGE_PER_LVL     = 1f;
+    private const float BASE_DAMAGE = 1f;
+    private const float DAMAGE_PER_LVL = 1f;
 
-    private const float BASE_MAX_HP        = 1f;
-    private const float HP_PER_LVL         = 1f;
+    private const float BASE_MAX_HP = 3f;
+    private const float HP_PER_LVL  = 1f;
 
     public event Action<UpgradeType> OnUpgradePurchased;
 
