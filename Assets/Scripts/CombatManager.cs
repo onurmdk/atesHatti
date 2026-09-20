@@ -65,32 +65,36 @@ public class CombatManager : MonoBehaviour
             return;
         }
     }
-
-    private void HandleBulletHitsEnemy(GameObject bulletObj, Collider2D enemyCollider)
+    private void HandleBulletHitsEnemy(GameObject bulletObj, Collider2D targetCollider)
     {
-        Bullet bullet = bulletObj.GetComponent<Bullet>();
-        Enemy  enemy  = enemyCollider.GetComponent<Enemy>();
+        Bullet      bullet = bulletObj.GetComponent<Bullet>();
+        IDamageable target = targetCollider.GetComponent<IDamageable>();
 
-        if (bullet == null || enemy == null) return;
-        if (!enemy.IsAlive) return;
+        if (bullet == null || target == null) return;
+        if (!target.IsAlive) return;
+
+        // Read everything we need BEFORE applying damage: a dying target is
+        // either released back to its pool or destroyed inside TakeDamage().
+        Vector3 hitPos    = bulletObj.transform.position;
+        Vector3 targetPos = targetCollider.transform.position;
+        int     goldValue = target.GoldValue;
+
+        SpriteRenderer targetRenderer = targetCollider.GetComponent<SpriteRenderer>();
+        Color targetTint = targetRenderer != null ? targetRenderer.color : Color.red;
 
         bullet.OnHitTarget();
 
-        Vector3 hitPos = bulletObj.transform.position;
-        bool killed = enemy.TakeDamage(_bulletBaseDamage);
+        bool killed = target.TakeDamage(_bulletBaseDamage);
 
         if (killed)
         {
-            Vector3 enemyPos = enemyCollider.transform.position;
-            Color enemyColor = enemyCollider.GetComponent<SpriteRenderer>()?.color ?? Color.red;
-
             if (ParticleManager.Instance != null)
-                ParticleManager.Instance.PlayExplosion(enemyPos, enemyColor);
+                ParticleManager.Instance.PlayExplosion(targetPos, targetTint);
 
-            OnEnemyKilled?.Invoke(enemy.GoldValue, enemyPos);
+            OnEnemyKilled?.Invoke(goldValue, targetPos);
 
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.Log($"[Combat] Düşman öldürüldü! +{enemy.GoldValue} Gold");
+            Debug.Log($"[Combat] Target destroyed! +{goldValue} Gold");
             #endif
         }
         else

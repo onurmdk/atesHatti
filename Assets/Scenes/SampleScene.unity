@@ -633,7 +633,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b1d40f1e1eab1b4f9da513eb6624315, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
-  _maxHp: 1
+  _maxHp: 10
   _iFrameDuration: 0.6
   _blinkFrequency: 12
 --- !u!50 &117314146

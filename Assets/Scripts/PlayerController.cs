@@ -73,7 +73,6 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        #if UNITY_EDITOR || UNITY_STANDALONE
         if (Input.GetMouseButton(0))
         {
             if (IsPointerOverUI(-1))
@@ -81,7 +80,6 @@ public class PlayerController : MonoBehaviour
 
             _targetWorldPos = ScreenPointToClampedWorld(Input.mousePosition);
         }
-        #endif
     }
 
     private void ApplyMovement()

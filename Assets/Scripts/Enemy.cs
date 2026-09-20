@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Pool;
 
 [RequireComponent(typeof(SpriteRenderer))]
-public class Enemy : MonoBehaviour
+public class Enemy : MonoBehaviour, IDamageable
 {
     [Header("─── Düşman Stat'ları ───")]
     [Tooltip("Düşmanın maksimum can puanı.\n" +

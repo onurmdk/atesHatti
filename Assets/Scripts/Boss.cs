@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [RequireComponent(typeof(SpriteRenderer))]
-public class Boss : MonoBehaviour
+public class Boss : MonoBehaviour, IDamageable
 {
     [Header("─── Temel İstatistikler ───")]
     [SerializeField] private float _baseHp          = 35f;
@@ -186,36 +186,16 @@ public class Boss : MonoBehaviour
         return false;
     }
 
-    private void Die()
+        private void Die()
     {
-        Vector3 deathPos = _cachedTransform.position;
-
-        if (ParticleManager.Instance != null)
-        {
-            Color bossColor = _cachedSpriteRenderer != null
-                ? _cachedSpriteRenderer.color
-                : Color.magenta;
-
-            ParticleManager.Instance.PlayExplosion(deathPos, bossColor);
-        }
-
-        if (CombatManager.Instance != null)
-        {
-            if (GoldManager.Instance != null)
-            {
-                GoldManager.Instance.AddGold(_goldReward);
-            }
-        }
-
-        #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log($"[Boss] Öldü! Gold: +{_goldReward}");
-        #endif
-
+        // Explosion and gold are handled centrally in CombatManager,
+        // so every kill goes through the same path.
         Destroy(gameObject);
     }
 
     public float CurrentHp  => _currentHp;
     public float MaxHp      => _maxHp;
     public int   GoldReward => _goldReward;
+    public int GoldValue => _goldReward;
     public bool  IsAlive    => _currentHp > 0f;
 }

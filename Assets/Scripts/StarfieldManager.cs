@@ -13,7 +13,7 @@ public class StarfieldManager : MonoBehaviour
     [Header("─── Ayarlar ───")]
     [SerializeField, Range(20, 200)]
     private int _starCount = 80;
-
+    private const float STAR_LIFETIME = 3600f;
     [SerializeField]
     private Color _starColor = new Color(0.78f, 0.84f, 0.90f);
 
@@ -55,6 +55,7 @@ public class StarfieldManager : MonoBehaviour
 
         for (int i = 0; i < _starCount; i++)
         {
+            _particles[i].remainingLifetime = STAR_LIFETIME;
             _particles[i].position += Vector3.down * _starData[i].speed * dt;
 
             if (_particles[i].position.y < _screenMinY)
@@ -114,6 +115,8 @@ public class StarfieldManager : MonoBehaviour
                 (byte)(_starColor.b * 255),
                 (byte)(alpha * 255)
             );
+            _particles[i].startLifetime     = STAR_LIFETIME;
+            _particles[i].remainingLifetime = STAR_LIFETIME;
         }
 
         _ps.SetParticles(_particles, _starCount);
