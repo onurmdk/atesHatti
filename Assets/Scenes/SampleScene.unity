@@ -633,7 +633,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b1d40f1e1eab1b4f9da513eb6624315, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
-  _maxHp: 10
+  _maxHp: 1
   _iFrameDuration: 0.6
   _blinkFrequency: 12
 --- !u!50 &117314146
@@ -762,7 +762,7 @@ MonoBehaviour:
   _difficultyMultiplier: 0.88
   _spawnOffsetAboveScreen: 1.2
   _bossPrefab: {fileID: 375167685952414359, guid: 17417271fdc7c29418696b9bc1b6e32f, type: 3}
-  _bossInterval: 45
+  _bossInterval: 20
   _bossStopY: 3.5
 --- !u!4 &117832132
 Transform:
