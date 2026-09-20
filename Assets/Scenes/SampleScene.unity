@@ -756,13 +756,13 @@ MonoBehaviour:
   - {fileID: 1899258792245306476, guid: c6313931a427f35438b05b596a5bc77a, type: 3}
   _poolDefaultCapacity: 30
   _poolMaxSize: 60
-  _baseSpawnInterval: 1.2
+  _baseSpawnInterval: 1.5
   _minSpawnInterval: 0.25
   _difficultyInterval: 15
   _difficultyMultiplier: 0.88
   _spawnOffsetAboveScreen: 1.2
   _bossPrefab: {fileID: 375167685952414359, guid: 17417271fdc7c29418696b9bc1b6e32f, type: 3}
-  _bossInterval: 20
+  _bossInterval: 45
   _bossStopY: 3.5
 --- !u!4 &117832132
 Transform:
@@ -2078,7 +2078,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &372924736
 RectTransform:
   m_ObjectHideFlags: 0
@@ -7255,7 +7255,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1316199464
 RectTransform:
   m_ObjectHideFlags: 0

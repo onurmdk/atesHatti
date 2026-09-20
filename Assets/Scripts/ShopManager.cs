@@ -36,7 +36,7 @@ public class ShopManager : MonoBehaviour
         new UpgradeConfig(UpgradeType.MaxHP,    15,  1.5f, 7,  "MAX HP",    "#2ED573"),
     };
 
-    private const float BASE_FIRE_INTERVAL = 0.65f;
+    private const float BASE_FIRE_INTERVAL = 0.45f;
     private const float MIN_FIRE_INTERVAL = 0.08f;
     private const float FIRE_RATE_PER_LVL = -0.025f;
 
