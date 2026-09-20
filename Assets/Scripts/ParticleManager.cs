@@ -5,20 +5,20 @@ public class ParticleManager : MonoBehaviour
 {
     public static ParticleManager Instance { get; private set; }
 
-    [Header("─── Patlama Efekti ───")]
-    [Tooltip("Patlama partikül prefab'ı.\n" +
-             "ParticleSystem bileşeni olmalı.\n" +
-             "StopAction otomatik olarak Callback'e set edilir.")]
+    [Header("─── Explosion Effect ───")]
+    [Tooltip("Explosion particle prefab.\n" +
+             "Must have a ParticleSystem component.\n" +
+             "StopAction is automatically set to Callback.")]
     [SerializeField]
     private ParticleSystem _explosionPrefab;
 
-    [Header("─── İsabet Kıvılcımı ───")]
-    [Tooltip("Mermi isabet kıvılcım prefab'ı (isteğe bağlı).\n" +
-             "null ise küçük isabet efekti için de patlama prefab'ı kullanılır.")]
+    [Header("─── Hit Spark ───")]
+    [Tooltip("Bullet hit spark prefab (optional).\n" +
+             "If null, the explosion prefab is used for small hit effects as well.")]
     [SerializeField]
     private ParticleSystem _sparkPrefab;
 
-    [Header("─── Pool Ayarları ───")]
+    [Header("─── Pool Settings ───")]
     [SerializeField, Range(5, 30)]
     private int _poolDefaultCapacity = 10;
 
@@ -172,7 +172,7 @@ public class ParticleManager : MonoBehaviour
     private void ValidateSetup()
     {
         if (_explosionPrefab == null)
-            Debug.LogError("[ParticleManager] Explosion prefab atanmamış!", this);
+            Debug.LogError("[ParticleManager] Explosion prefab not assigned!", this);
     }
 }
 

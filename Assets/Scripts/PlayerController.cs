@@ -3,18 +3,18 @@ using UnityEngine;
 [RequireComponent(typeof(SpriteRenderer))]
 public class PlayerController : MonoBehaviour
 {
-    [Header("─── Hareket ───")]
-    [Tooltip("Takip hızı (exponential decay katsayısı).\n" +
-             "Düşük (3-5) = kaygan/ağır his.\n" +
-             "Yüksek (15-25) = keskin/ani tepki.\n" +
-             "12 = HTML prototipindeki referans his.")]
+    [Header("─── Movement ───")]
+    [Tooltip("Follow speed (exponential decay factor).\n" +
+             "Low (3-5) = sluggish/heavy feel.\n" +
+             "High (15-25) = sharp/snappy response.\n" +
+             "12 = reference feel from the HTML prototype.")]
     [SerializeField, Range(1f, 30f)]
     private float _followSpeed = 12f;
 
-    [Header("─── Ekran Sınırları ───")]
-    [Tooltip("Sprite kenarı ile ekran kenarı arasındaki minimum boşluk (world units).\n" +
-             "0 = sprite tam ekran kenarına yapışır.\n" +
-             "0.1 = küçük bir nefes payı bırakır.")]
+    [Header("─── Screen Bounds ───")]
+    [Tooltip("Minimum gap between the sprite edge and the screen edge (world units).\n" +
+             "0 = sprite snaps flush to the screen edge.\n" +
+             "0.1 = leaves a small breathing margin.")]
     [SerializeField, Range(0f, 0.5f)]
     private float _edgePadding = 0.05f;
 
@@ -187,8 +187,8 @@ public class PlayerController : MonoBehaviour
             _spriteHalfW = 0.5f;
             _spriteHalfH = 0.5f;
 
-            LogWarning("SpriteRenderer veya Sprite bulunamadı. " +
-                       "Varsayılan extents (0.5, 0.5) kullanılıyor.");
+            LogWarning("SpriteRenderer or Sprite not found. " +
+                       "Using default extents (0.5, 0.5).");
         }
     }
 
@@ -211,13 +211,13 @@ public class PlayerController : MonoBehaviour
     {
         if (_mainCamera == null)
             Debug.LogError(
-                "[PlayerController] Sahnede 'MainCamera' tag'li kamera bulunamadı! " +
-                "Kameranın tag'ini kontrol edin.", this);
+                "[PlayerController] No camera with the 'MainCamera' tag found in the scene! " +
+                "Check the camera's tag.", this);
 
         if (GetComponent<SpriteRenderer>() == null)
             Debug.LogError(
-                "[PlayerController] Bu GameObject'te SpriteRenderer yok! " +
-                "RequireComponent olmasına rağmen çalışma zamanında kaldırılmış olabilir.", this);
+                "[PlayerController] No SpriteRenderer on this GameObject! " +
+                "It may have been removed at runtime despite RequireComponent.", this);
     }
 
     [System.Diagnostics.Conditional("UNITY_EDITOR"),

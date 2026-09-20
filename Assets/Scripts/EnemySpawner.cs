@@ -3,57 +3,57 @@ using UnityEngine.Pool;
 
 public class EnemySpawner : MonoBehaviour
 {
-    [Header("─── Düşman Prefab'ları ───")]
-    [Tooltip("3 elemanlı dizi: [0]=Weak, [1]=Medium, [2]=Strong.\n" +
-             "Her prefab kendi stat'larını (HP, speed, drift, gold)\n" +
-             "Inspector'da taşır. Sıralama KRİTİK — CDF indeksleri buna bağlı.")]
+    [Header("─── Enemy Prefabs ───")]
+    [Tooltip("Array of 3 elements: [0]=Weak, [1]=Medium, [2]=Strong.\n" +
+             "Each prefab carries its own stats (HP, speed, drift, gold)\n" +
+             "in the Inspector. The ordering is CRITICAL — CDF indices depend on it.")]
     [SerializeField]
     private Enemy[] _enemyPrefabs;
 
-    [Header("─── Pool Ayarları (Her Prefab İçin) ───")]
-    [Tooltip("Her pool'un başlangıç kapasitesi.")]
+    [Header("─── Pool Settings (Per Prefab) ───")]
+    [Tooltip("Initial capacity of each pool.")]
     [SerializeField, Range(5, 30)]
     private int _poolDefaultCapacity = 10;
 
-    [Tooltip("Her pool'un maksimum inaktif obje sayısı.")]
+    [Tooltip("Maximum number of inactive objects in each pool.")]
     [SerializeField, Range(15, 60)]
     private int _poolMaxSize = 25;
 
-    [Header("─── Spawn Zamanlaması ───")]
-    [Tooltip("İlk spawn aralığı (saniye). Her difficulty bump'ta azalır.")]
+    [Header("─── Spawn Timing ───")]
+    [Tooltip("Initial spawn interval (seconds). Decreases on each difficulty bump.")]
     [SerializeField, Range(0.3f, 3f)]
     private float _baseSpawnInterval = 1.2f;
 
-    [Tooltip("Spawn aralığının düşebileceği minimum değer (saniye).\n" +
-             "Bu sınır olmazsa spawn hızı sonsuza gider ve ekran düşmanla dolar.")]
+    [Tooltip("Minimum value the spawn interval can reach (seconds).\n" +
+             "Without this floor, spawn rate would approach infinity and fill the screen with enemies.")]
     [SerializeField, Range(0.15f, 0.8f)]
     private float _minSpawnInterval = 0.25f;
 
-    [Header("─── Zorluk Skalalaması ───")]
-    [Tooltip("Kaç saniyede bir zorluk artar.")]
+    [Header("─── Difficulty Scaling ───")]
+    [Tooltip("How often difficulty increases (seconds).")]
     [SerializeField, Range(5f, 30f)]
     private float _difficultyInterval = 15f;
 
-    [Tooltip("Her zorluk artışında spawn aralığı bu katsayıyla çarpılır.\n" +
-             "0.88 = her 15 saniyede %12 hızlanma.")]
+    [Tooltip("The spawn interval is multiplied by this factor on each difficulty increase.\n" +
+             "0.88 = 12% speedup every 15 seconds.")]
     [SerializeField, Range(0.7f, 0.98f)]
     private float _difficultyMultiplier = 0.88f;
 
-    [Header("─── Spawn Pozisyonu ───")]
-    [Tooltip("Düşmanın ekranın üstünden ne kadar yukarıda spawn olacağı.")]
+    [Header("─── Spawn Position ───")]
+    [Tooltip("How far above the top of the screen enemies spawn.")]
     [SerializeField, Range(0.5f, 3f)]
     private float _spawnOffsetAboveScreen = 1.2f;
 
-    [Header("─── Boss Sistemi ───")]
-    [Tooltip("Boss prefab'ı. Inspector'dan sürükle.")]
+    [Header("─── Boss System ───")]
+    [Tooltip("Boss prefab. Drag in from the Inspector.")]
     [SerializeField]
     private Boss _bossPrefab;
 
-    [Tooltip("İlk boss'un gelme süresi (saniye).")]
+    [Tooltip("Time until the first boss appears (seconds).")]
     [SerializeField, Range(20f, 120f)]
     private float _bossInterval = 45f;
 
-    [Tooltip("Boss'un ekranın üstünden inip duracağı Y noktası.")]
+    [Tooltip("Y position where the boss stops after descending from the top of the screen.")]
     [SerializeField]
     private float _bossStopY = 3.5f;
 
@@ -220,7 +220,7 @@ public class EnemySpawner : MonoBehaviour
             RecalculateTierWeights();
 
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.Log($"[EnemySpawner] Zorluk Lv{_difficultyLevel} | " +
+            Debug.Log($"[EnemySpawner] Difficulty Lv{_difficultyLevel} | " +
                       $"Spawn: {_currentSpawnInterval:F3}s | " +
                       $"CDF: [{_currentTierCDF[0]:F2}, {_currentTierCDF[1]:F2}, {_currentTierCDF[2]:F2}]");
             #endif
@@ -299,7 +299,7 @@ public class EnemySpawner : MonoBehaviour
         if (_bossPrefab == null)
         {
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.LogError("[EnemySpawner] Boss prefab atanmamış!", this);
+            Debug.LogError("[EnemySpawner] Boss prefab not assigned!", this);
             #endif
             return;
         }
@@ -416,26 +416,26 @@ public class EnemySpawner : MonoBehaviour
     private void ValidateSetup()
     {
         if (_enemyPrefabs == null || _enemyPrefabs.Length == 0)
-            Debug.LogError("[EnemySpawner] Enemy Prefab dizisi boş! " +
-                           "Inspector'dan 3 prefab atayın.", this);
+            Debug.LogError("[EnemySpawner] Enemy Prefab array is empty! " +
+                           "Assign 3 prefabs in the Inspector.", this);
 
         if (_enemyPrefabs != null && _enemyPrefabs.Length != 3)
-            Debug.LogWarning($"[EnemySpawner] {_enemyPrefabs.Length} prefab atanmış, " +
-                             "3 bekleniyor (Weak, Medium, Strong).", this);
+            Debug.LogWarning($"[EnemySpawner] {_enemyPrefabs.Length} prefab(s) assigned, " +
+                             "3 expected (Weak, Medium, Strong).", this);
 
         if (_mainCamera == null)
-            Debug.LogError("[EnemySpawner] MainCamera bulunamadı!", this);
+            Debug.LogError("[EnemySpawner] MainCamera not found!", this);
 
         if (_bossPrefab == null)
-            Debug.LogWarning("[EnemySpawner] Boss prefab atanmamış — " +
-                             "Boss fight çalışmayacak.", this);
+            Debug.LogWarning("[EnemySpawner] Boss prefab not assigned — " +
+                             "Boss fight will not work.", this);
 
         if (_enemyPrefabs != null)
         {
             for (int i = 0; i < _enemyPrefabs.Length; i++)
             {
                 if (_enemyPrefabs[i] == null)
-                    Debug.LogError($"[EnemySpawner] Prefab[{i}] null!", this);
+                    Debug.LogError($"[EnemySpawner] Prefab[{i}] is null!", this);
             }
         }
     }

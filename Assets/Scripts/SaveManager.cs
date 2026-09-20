@@ -104,13 +104,13 @@ public class SaveManager : MonoBehaviour
                 if (_data == null)
                 {
                     _data = new PlayerSaveData();
-                    LogWarning("Kaydedilmiş veri null döndü — varsayılan oluşturuldu.");
+                    LogWarning("Saved data returned null — created default.");
                 }
             }
             catch (Exception e)
             {
                 _data = new PlayerSaveData();
-                LogWarning($"Save verisi okunamadı: {e.Message}. Varsayılan oluşturuldu.");
+                LogWarning($"Save data could not be read: {e.Message}. Created default.");
             }
         }
         else
@@ -119,7 +119,7 @@ public class SaveManager : MonoBehaviour
         }
 
         #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log($"[SaveManager] Veri yüklendi → " +
+        Debug.Log($"[SaveManager] Data loaded → " +
                   $"FR Lv{_data.fireRateLevel} | DMG Lv{_data.damageLevel} | " +
                   $"HP Lv{_data.maxHpLevel} | Gold: {_data.persistentGold} | " +
                   $"High Score: {_data.highScore:F1}s | Games: {_data.totalGamesPlayed}");
@@ -130,7 +130,7 @@ public class SaveManager : MonoBehaviour
     {
         if (_data == null)
         {
-            LogWarning("Data null — kaydetme atlandı.");
+            LogWarning("Data is null — save skipped.");
             return;
         }
 
@@ -141,7 +141,7 @@ public class SaveManager : MonoBehaviour
         OnDataSaved?.Invoke();
 
         #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log("[SaveManager] Veri kaydedildi → " + json);
+        Debug.Log("[SaveManager] Data saved → " + json);
         #endif
     }
 
@@ -156,7 +156,7 @@ public class SaveManager : MonoBehaviour
         OnNewHighScore?.Invoke(newScore);
 
         #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log($"[SaveManager] YENİ YÜKSEK SKOR: {newScore:F1}s!");
+        Debug.Log($"[SaveManager] NEW HIGH SCORE: {newScore:F1}s!");
         #endif
 
         return true;
@@ -203,7 +203,7 @@ public class SaveManager : MonoBehaviour
         MarkDirty();
     }
 
-    [ContextMenu("Tüm Save Verisini Sil")]
+    [ContextMenu("Delete All Save Data")]
     public void DeleteAllData()
     {
         PlayerPrefs.DeleteKey(SAVE_KEY);
@@ -211,7 +211,7 @@ public class SaveManager : MonoBehaviour
         _data = new PlayerSaveData();
 
         #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log("[SaveManager] Tüm save verisi silindi!");
+        Debug.Log("[SaveManager] All save data deleted!");
         #endif
     }
 

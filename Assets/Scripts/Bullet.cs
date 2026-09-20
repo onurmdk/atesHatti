@@ -3,11 +3,11 @@ using UnityEngine.Pool;
 
 public class Bullet : MonoBehaviour
 {
-    [Header("─── Mermi Ayarları ───")]
-    [Tooltip("Merminin yukarı doğru hareket hızı (world units/saniye).\n" +
-             "Çok düşük = oyuncu merminin hedefe ulaşmasını bekler, tempo düşer.\n" +
-             "Çok yüksek = mermi görünmeden kaybolur, tatmin hissi azalır.\n" +
-             "15-20 arası 2D shooter'lar için ideal aralık.")]
+    [Header("─── Bullet Settings ───")]
+    [Tooltip("Bullet upward movement speed (world units/second).\n" +
+             "Too low = the player waits for the bullet to reach its target, pacing suffers.\n" +
+             "Too high = the bullet disappears before it is seen, satisfaction is reduced.\n" +
+             "15-20 is the ideal range for 2D shooters.")]
     [SerializeField, Range(5f, 40f)]
     private float _speed = 18f;
 
@@ -66,8 +66,8 @@ public class Bullet : MonoBehaviour
             gameObject.SetActive(false);
 
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.LogWarning("[Bullet] Pool referansı null — doğrudan deaktif edildi. " +
-                             "Bu mermi Initialize() çağrılmadan mı kullanıldı?", this);
+            Debug.LogWarning("[Bullet] Pool reference is null — deactivated directly. " +
+                             "Was this bullet used without calling Initialize()?", this);
             #endif
         }
     }

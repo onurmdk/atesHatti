@@ -4,23 +4,23 @@ using UnityEngine.Pool;
 [RequireComponent(typeof(SpriteRenderer))]
 public class Enemy : MonoBehaviour, IDamageable
 {
-    [Header("─── Düşman Stat'ları ───")]
-    [Tooltip("Düşmanın maksimum can puanı.\n" +
-             "Her spawn'da bu değere resetlenir.")]
+    [Header("─── Enemy Stats ───")]
+    [Tooltip("Enemy maximum hit points.\n" +
+             "Reset to this value on every spawn.")]
     [SerializeField]
     private float _maxHp = 1f;
 
-    [Tooltip("Aşağı doğru hareket hızı (world units/saniye).\n" +
-             "Weak: 4, Medium: 2.8, Strong: 1.8 önerilir.")]
+    [Tooltip("Downward movement speed (world units/second).\n" +
+             "Recommended: Weak: 4, Medium: 2.8, Strong: 1.8.")]
     [SerializeField]
     private float _speed = 3f;
 
-    [Tooltip("Yanal kayma hızı (mutlak değer, yön runtime'da atanır).\n" +
-             "Weak: 1.5, Medium: 1.0, Strong: 0.6 önerilir.")]
+    [Tooltip("Lateral drift speed (absolute value; direction is assigned at runtime).\n" +
+             "Recommended: Weak: 1.5, Medium: 1.0, Strong: 0.6.")]
     [SerializeField]
     private float _driftSpeed = 1f;
 
-    [Tooltip("Öldürüldüğünde düşecek altın miktarı.")]
+    [Tooltip("Gold dropped when killed.")]
     [SerializeField]
     private int _goldValue = 1;
 
@@ -127,7 +127,7 @@ public class Enemy : MonoBehaviour, IDamageable
             gameObject.SetActive(false);
 
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.LogWarning("[Enemy] Pool referansı null — doğrudan deaktif edildi.", this);
+            Debug.LogWarning("[Enemy] Pool reference is null — deactivated directly.", this);
             #endif
         }
     }

@@ -3,29 +3,29 @@ using TMPro;
 
 public class HUDController : MonoBehaviour
 {
-    [Header("─── Üst HUD Metinleri ───")]
-    [Tooltip("Altın miktarını gösteren text.\n" +
+    [Header("─── Top HUD Texts ───")]
+    [Tooltip("Text showing the gold amount.\n" +
              "Format: 'GOLD: 150'")]
     [SerializeField]
     private TextMeshProUGUI _goldText;
 
-    [Tooltip("Oyuncu canını gösteren text.\n" +
+    [Tooltip("Text showing the player's HP.\n" +
              "Format: 'HP 7/10'")]
     [SerializeField]
     private TextMeshProUGUI _hpText;
 
-    [Tooltip("Öldürülen düşman sayısını gösteren text.\n" +
+    [Tooltip("Text showing the number of enemies killed.\n" +
              "Format: 'KILLS: 42'")]
     [SerializeField]
     private TextMeshProUGUI _killsText;
 
-    [Tooltip("Oyun süresini gösteren text.\n" +
+    [Tooltip("Text showing the game time.\n" +
              "Format: 'TIME: 1:05'")]
     [SerializeField]
     private TextMeshProUGUI _timeText;
 
-    [Header("─── Oyuncu Referansı ───")]
-    [Tooltip("PlayerHealth bileşenine sahip Player objesi.")]
+    [Header("─── Player Reference ───")]
+    [Tooltip("Player object with a PlayerHealth component.")]
     [SerializeField]
     private PlayerHealth _playerHealth;
 
@@ -58,7 +58,7 @@ public class HUDController : MonoBehaviour
         }
         else
         {
-            LogWarning("GoldManager bulunamadı — altın göstergesi çalışmayacak.");
+            LogWarning("GoldManager not found — gold display will not work.");
         }
 
         if (_playerHealth != null)
@@ -67,7 +67,7 @@ public class HUDController : MonoBehaviour
         }
         else
         {
-            LogWarning("PlayerHealth atanmamış — HP göstergesi çalışmayacak.");
+            LogWarning("PlayerHealth not assigned — HP display will not work.");
         }
 
         if (CombatManager.Instance != null)
@@ -76,7 +76,7 @@ public class HUDController : MonoBehaviour
         }
         else
         {
-            LogWarning("CombatManager bulunamadı — kill sayacı çalışmayacak.");
+            LogWarning("CombatManager not found — kill counter will not work.");
         }
     }
 
@@ -175,19 +175,19 @@ public class HUDController : MonoBehaviour
     private void ValidateReferences()
     {
         if (_goldText == null)
-            Debug.LogError("[HUDController] GoldText atanmamış!", this);
+            Debug.LogError("[HUDController] GoldText not assigned!", this);
 
         if (_hpText == null)
-            Debug.LogError("[HUDController] HpText atanmamış!", this);
+            Debug.LogError("[HUDController] HpText not assigned!", this);
 
         if (_killsText == null)
-            Debug.LogWarning("[HUDController] KillsText atanmamış.", this);
+            Debug.LogWarning("[HUDController] KillsText not assigned.", this);
 
         if (_timeText == null)
-            Debug.LogWarning("[HUDController] TimeText atanmamış.", this);
+            Debug.LogWarning("[HUDController] TimeText not assigned.", this);
 
         if (_playerHealth == null)
-            Debug.LogError("[HUDController] PlayerHealth atanmamış!", this);
+            Debug.LogError("[HUDController] PlayerHealth not assigned!", this);
     }
 
     [System.Diagnostics.Conditional("UNITY_EDITOR"),

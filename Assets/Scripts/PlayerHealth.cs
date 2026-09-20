@@ -4,18 +4,18 @@ using System;
 [RequireComponent(typeof(SpriteRenderer))]
 public class PlayerHealth : MonoBehaviour
 {
-    [Header("─── Sağlık ───")]
-    [Tooltip("Başlangıç / maksimum HP. Upgrade sistemi bu değeri artıracak.")]
+    [Header("─── Health ───")]
+    [Tooltip("Starting / maximum HP. The upgrade system will increase this value.")]
     [SerializeField]
     private float _maxHp = 10f;
 
-    [Header("─── Dokunulmazlık (iFrame) ───")]
-    [Tooltip("Hasar aldıktan sonra dokunulmaz kalınan süre (saniye).")]
+    [Header("─── Invincibility (iFrame) ───")]
+    [Tooltip("Duration of invincibility after taking damage (seconds).")]
     [SerializeField, Range(0.1f, 2f)]
     private float _iFrameDuration = 0.6f;
 
-    [Tooltip("Blink hızı (saniyede kaç kez yanıp söner).\n" +
-             "12 = saniyede 12 blink → 60fps'de her 5 frame'de bir.")]
+    [Tooltip("Blink rate (how many times per second the sprite flashes).\n" +
+             "12 = 12 blinks per second → once every 5 frames at 60 fps.")]
     [SerializeField, Range(4f, 24f)]
     private float _blinkFrequency = 12f;
 
@@ -96,7 +96,7 @@ public class PlayerHealth : MonoBehaviour
         _spriteRenderer.enabled = true; 
 
         #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log("[PlayerHealth] GAME OVER — Oyuncu öldü!");
+        Debug.Log("[PlayerHealth] GAME OVER — Player died!");
         #endif
 
         OnPlayerDeath?.Invoke();

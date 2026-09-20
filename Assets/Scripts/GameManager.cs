@@ -18,73 +18,73 @@ public class GameManager : MonoBehaviour
 
     public event Action OnBeforeRestart;
 
-    [Header("─── Ana Menü UI ───")]
-    [Tooltip("Ana Menü paneli. Oyun açıldığında aktif olur.\n" +
-             "BAŞLAT butonuna basılınca kapanır.\n" +
+    [Header("─── Main Menu UI ───")]
+    [Tooltip("Main Menu panel. Becomes active when the game opens.\n" +
+             "Closes when the START button is pressed.\n" +
              "Hierarchy: Canvas → MainMenuPanel")]
     [SerializeField]
     private GameObject _mainMenuPanel;
 
-    [Header("─── Mağaza / HUD Paneli ───")]
-    [Tooltip("ShopPanel objesi. Ana Menüde toggle ile açılıp kapanır.\n" +
-             "Oyun başladığında HUD olarak görünür ama tıklanamaz.\n" +
+    [Header("─── Shop / HUD Panel ───")]
+    [Tooltip("ShopPanel object. Toggled open and closed in the Main Menu.\n" +
+             "Visible as the HUD when the game is running but not clickable.\n" +
              "Hierarchy: Canvas → ShopPanel")]
     [SerializeField]
     private GameObject _shopPanel;
 
-    [Tooltip("ShopPanel üzerindeki CanvasGroup bileşeni.\n" +
-             "interactable ve blocksRaycasts kontrolü için kullanılır.\n" +
-             "Ana Menüde: tıklanabilir (mağaza). Oyun içinde: sadece görüntü (HUD).")]
+    [Tooltip("CanvasGroup component on the ShopPanel.\n" +
+             "Used to control interactable and blocksRaycasts.\n" +
+             "In Main Menu: clickable (shop). In-game: display only (HUD).")]
     [SerializeField]
     private CanvasGroup _shopCanvasGroup;
 
     [Header("─── Game Over UI ───")]
-    [Tooltip("Game Over paneli. Başlangıçta deaktif olmalı.\n" +
+    [Tooltip("Game Over panel. Must be inactive at startup.\n" +
              "Hierarchy: Canvas → GameOverPanel")]
     [SerializeField]
     private GameObject _gameOverPanel;
 
-    [Header("─── Duraklatma (Pause) UI ───")]
-    [Tooltip("Duraklatma menü paneli. Oyun içinde Pause butonuna basılınca açılır.\n" +
+    [Header("─── Pause UI ───")]
+    [Tooltip("Pause menu panel. Opens when the Pause button is pressed during gameplay.\n" +
              "Hierarchy: Canvas → PausePanel")]
     [SerializeField]
     private GameObject _pausePanel;
 
-    [Tooltip("Sağ üst köşedeki durdurma butonu. Oyun sırasında görünür.\n" +
-             "MainMenu ve GameOver'da gizlenir.\n" +
+    [Tooltip("Stop button in the top-right corner. Visible during gameplay.\n" +
+             "Hidden on MainMenu and GameOver.\n" +
              "Hierarchy: Canvas → Btn_Pause")]
     [SerializeField]
     private GameObject _pauseButtonHUD;
 
-    [Header("─── İstatistik Metinleri (Opsiyonel) ───")]
-    [Tooltip("Hayatta kalma süresini gösteren text.\n" +
-             "null bırakılabilir — yoksa atlanır.")]
+    [Header("─── Stats Texts (Optional) ───")]
+    [Tooltip("Text showing survival time.\n" +
+             "Can be left null — skipped if missing.")]
     [SerializeField]
     private TMPro.TextMeshProUGUI _survivalTimeText;
 
-    [Tooltip("Toplam kazanılan altını gösteren text.\n" +
-             "null bırakılabilir — yoksa atlanır.")]
+    [Tooltip("Text showing total gold earned.\n" +
+             "Can be left null — skipped if missing.")]
     [SerializeField]
     private TMPro.TextMeshProUGUI _totalGoldText;
 
-    [Tooltip("Öldürülen düşman sayısını gösteren text.\n" +
-             "null bırakılabilir — yoksa atlanır.")]
+    [Tooltip("Text showing number of enemies killed.\n" +
+             "Can be left null — skipped if missing.")]
     [SerializeField]
     private TMPro.TextMeshProUGUI _killsText;
 
-    [Header("─── Ana Menü Vitrin (UI) ───")]
-    [Tooltip("Ana Menüdeki toplam altın göstergesi.\n" +
+    [Header("─── Main Menu Display (UI) ───")]
+    [Tooltip("Total gold display in the Main Menu.\n" +
              "Rich Text: '<color=#FFC107>GOLD: 150</color>'")]
     [SerializeField]
     private TextMeshProUGUI _mainMenuTotalGoldText;
 
-    [Tooltip("Ana Menüdeki yüksek skor göstergesi.\n" +
+    [Tooltip("High score display in the Main Menu.\n" +
              "Rich Text: '<color=#00C2FF>HIGH SCORE: 2:35</color>'")]
     [SerializeField]
     private TextMeshProUGUI _mainMenuHighScoreText;
 
-    [Header("─── Oyuncu Referansı ───")]
-    [Tooltip("PlayerHealth bileşenine sahip Player objesi.")]
+    [Header("─── Player Reference ───")]
+    [Tooltip("Player object with a PlayerHealth component.")]
     [SerializeField]
     private PlayerHealth _playerHealth;
 
@@ -175,8 +175,8 @@ public class GameManager : MonoBehaviour
         else
         {
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.LogError("[GameManager] PlayerHealth referansı null — " +
-                           "Game Over tetiklenemeyecek!", this);
+            Debug.LogError("[GameManager] PlayerHealth reference is null — " +
+                           "Game Over cannot be triggered!", this);
             #endif
         }
 
@@ -251,7 +251,7 @@ public class GameManager : MonoBehaviour
         OnGameStateChanged?.Invoke(_currentState);
 
         #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log("[GameManager] Oyun başladı — State: Playing");
+        Debug.Log("[GameManager] Game started — State: Playing");
         #endif
     }
 
@@ -295,7 +295,7 @@ public class GameManager : MonoBehaviour
             _pauseButtonHUD.SetActive(false);
 
         #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log("[GameManager] Oyun duraklatıldı.");
+        Debug.Log("[GameManager] Game paused.");
         #endif
     }
 
@@ -310,7 +310,7 @@ public class GameManager : MonoBehaviour
             _pauseButtonHUD.SetActive(true);
 
         #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log("[GameManager] Oyuna devam edildi.");
+        Debug.Log("[GameManager] Game resumed.");
         #endif
     }
 
@@ -337,8 +337,8 @@ public class GameManager : MonoBehaviour
         OnGameStateChanged?.Invoke(_currentState);
 
         #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log($"[GameManager] GAME OVER — Süre: {FormatTime(_elapsedTime)} | " +
-                  $"Altın: {(GoldManager.Instance != null ? GoldManager.Instance.TotalGoldEarned : 0)}");
+        Debug.Log($"[GameManager] GAME OVER — Time: {FormatTime(_elapsedTime)} | " +
+                  $"Gold: {(GoldManager.Instance != null ? GoldManager.Instance.TotalGoldEarned : 0)}");
         #endif
 
         if (SaveManager.Instance != null)
@@ -358,7 +358,7 @@ public class GameManager : MonoBehaviour
         if (_gameOverPanel == null)
         {
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.LogWarning("[GameManager] GameOverPanel referansı null — UI gösterilemiyor!", this);
+            Debug.LogWarning("[GameManager] GameOverPanel reference is null — UI cannot be shown!", this);
             #endif
             return;
         }
@@ -433,39 +433,39 @@ public class GameManager : MonoBehaviour
     private void ValidateSetup()
     {
         if (_playerHealth == null)
-            Debug.LogError("[GameManager] PlayerHealth atanmamış! " +
-                           "Game Over tetiklenemeyecek.", this);
+            Debug.LogError("[GameManager] PlayerHealth not assigned! " +
+                           "Game Over cannot be triggered.", this);
 
         if (_mainMenuPanel == null)
-            Debug.LogWarning("[GameManager] MainMenuPanel atanmamış — " +
-                             "Ana Menü gösterilmeyecek.", this);
+            Debug.LogWarning("[GameManager] MainMenuPanel not assigned — " +
+                             "Main Menu will not be shown.", this);
 
         if (_shopPanel == null)
-            Debug.LogWarning("[GameManager] ShopPanel atanmamış — " +
-                             "Mağaza/HUD gösterilmeyecek.", this);
+            Debug.LogWarning("[GameManager] ShopPanel not assigned — " +
+                             "Shop/HUD will not be shown.", this);
 
         if (_shopCanvasGroup == null && _shopPanel != null)
-            Debug.LogWarning("[GameManager] ShopPanel'e CanvasGroup atanmamış — " +
-                             "Etkileşim kontrolü çalışmayacak.", this);
+            Debug.LogWarning("[GameManager] No CanvasGroup assigned to ShopPanel — " +
+                             "Interaction control will not work.", this);
 
         if (_gameOverPanel == null)
-            Debug.LogWarning("[GameManager] GameOverPanel atanmamış — " +
-                             "Game Over UI gösterilmeyecek.", this);
+            Debug.LogWarning("[GameManager] GameOverPanel not assigned — " +
+                             "Game Over UI will not be shown.", this);
 
         if (_pausePanel == null)
-            Debug.LogWarning("[GameManager] PausePanel atanmamış — " +
-                             "Duraklatma menüsü gösterilmeyecek.", this);
+            Debug.LogWarning("[GameManager] PausePanel not assigned — " +
+                             "Pause menu will not be shown.", this);
 
         if (_pauseButtonHUD == null)
-            Debug.LogWarning("[GameManager] PauseButtonHUD atanmamış — " +
-                             "Duraklatma butonu gösterilmeyecek.", this);
+            Debug.LogWarning("[GameManager] PauseButtonHUD not assigned — " +
+                             "Pause button will not be shown.", this);
 
         if (_mainMenuTotalGoldText == null)
-            Debug.LogWarning("[GameManager] MainMenuTotalGoldText atanmamış — " +
-                             "Ana Menüde altın gösterilmeyecek.", this);
+            Debug.LogWarning("[GameManager] MainMenuTotalGoldText not assigned — " +
+                             "Gold will not be displayed in the Main Menu.", this);
 
         if (_mainMenuHighScoreText == null)
-            Debug.LogWarning("[GameManager] MainMenuHighScoreText atanmamış — " +
-                             "Ana Menüde yüksek skor gösterilmeyecek.", this);
+            Debug.LogWarning("[GameManager] MainMenuHighScoreText not assigned — " +
+                             "High score will not be displayed in the Main Menu.", this);
     }
 }

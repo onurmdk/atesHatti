@@ -10,7 +10,7 @@ public class StarfieldManager : MonoBehaviour
         public float alpha;
     }
 
-    [Header("─── Ayarlar ───")]
+    [Header("─── Settings ───")]
     [SerializeField, Range(20, 200)]
     private int _starCount = 80;
     private const float STAR_LIFETIME = 3600f;

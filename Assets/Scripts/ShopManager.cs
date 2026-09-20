@@ -48,7 +48,7 @@ public class ShopManager : MonoBehaviour
 
     public event Action<UpgradeType> OnUpgradePurchased;
 
-    [Header("═══ Oyuncu Sistemleri ═══")]
+    [Header("═══ Player Systems ═══")]
     [SerializeField] private PlayerShooting _playerShooting;
     [SerializeField] private PlayerHealth   _playerHealth;
 
@@ -165,7 +165,7 @@ public class ShopManager : MonoBehaviour
     {
         if (SaveManager.Instance == null || GoldManager.Instance == null)
         {
-            LogWarning("SaveManager veya GoldManager bulunamadı.");
+            LogWarning("SaveManager or GoldManager not found.");
             return false;
         }
 
@@ -190,7 +190,7 @@ public class ShopManager : MonoBehaviour
         #if UNITY_EDITOR || DEVELOPMENT_BUILD
         int newLevel = SaveManager.Instance.GetUpgradeLevel(type);
         Debug.Log($"[ShopManager] {type} Lv{newLevel - 1} → Lv{newLevel} | " +
-                  $"Harcanan: {cost}G | Kalan: {GoldManager.Instance.CurrentGold}G");
+                  $"Spent: {cost}G | Remaining: {GoldManager.Instance.CurrentGold}G");
         #endif
 
         return true;
@@ -218,7 +218,7 @@ public class ShopManager : MonoBehaviour
         bool isMax = level >= config.maxLevel;
         int  cost  = isMax ? -1 : GetUpgradeCost(type);
 
-        string costStr  = isMax ? "MAKS" : (cost.ToString() + " G");
+        string costStr  = isMax ? "MAX" : (cost.ToString() + " G");
         string levelStr = "Lv " + level.ToString();
 
         RefreshDetailedInfo(type, config, level, costStr);
@@ -263,7 +263,7 @@ public class ShopManager : MonoBehaviour
         if (btnText != null)
         {
             if (isMax)
-                btnText.SetText("MAKS SEVİYE");
+                btnText.SetText("MAX LEVEL");
             else
                 btnText.SetText(cost.ToString() + " G");
         }
@@ -407,31 +407,31 @@ public class ShopManager : MonoBehaviour
     private void ValidateSetup()
     {
         if (SaveManager.Instance == null)
-            Debug.LogError("[ShopManager] SaveManager bulunamadı!", this);
+            Debug.LogError("[ShopManager] SaveManager not found!", this);
 
         if (_playerShooting == null)
-            Debug.LogWarning("[ShopManager] PlayerShooting atanmamış.", this);
+            Debug.LogWarning("[ShopManager] PlayerShooting not assigned.", this);
 
         if (_playerHealth == null)
-            Debug.LogWarning("[ShopManager] PlayerHealth atanmamış.", this);
+            Debug.LogWarning("[ShopManager] PlayerHealth not assigned.", this);
 
         if (_detailedFireRateInfo == null || _detailedFireRateBuyBtn == null)
-            Debug.LogWarning("[ShopManager] Detailed FireRate referansları eksik!", this);
+            Debug.LogWarning("[ShopManager] Detailed FireRate references are missing!", this);
 
         if (_detailedDamageInfo == null || _detailedDamageBuyBtn == null)
-            Debug.LogWarning("[ShopManager] Detailed Damage referansları eksik!", this);
+            Debug.LogWarning("[ShopManager] Detailed Damage references are missing!", this);
 
         if (_detailedMaxHpInfo == null || _detailedMaxHpBuyBtn == null)
-            Debug.LogWarning("[ShopManager] Detailed MaxHp referansları eksik!", this);
+            Debug.LogWarning("[ShopManager] Detailed MaxHp references are missing!", this);
 
         if (_infoFireRateLevel == null || _infoFireRateCost == null)
-            Debug.LogWarning("[ShopManager] Info FireRate referansları eksik!", this);
+            Debug.LogWarning("[ShopManager] Info FireRate references are missing!", this);
 
         if (_infoDamageLevel == null || _infoDamageCost == null)
-            Debug.LogWarning("[ShopManager] Info Damage referansları eksik!", this);
+            Debug.LogWarning("[ShopManager] Info Damage references are missing!", this);
 
         if (_infoMaxHpLevel == null || _infoMaxHpCost == null)
-            Debug.LogWarning("[ShopManager] Info MaxHp referansları eksik!", this);
+            Debug.LogWarning("[ShopManager] Info MaxHp references are missing!", this);
     }
 
     [System.Diagnostics.Conditional("UNITY_EDITOR"),

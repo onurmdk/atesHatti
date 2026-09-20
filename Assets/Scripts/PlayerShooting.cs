@@ -3,38 +3,38 @@ using UnityEngine.Pool;
 
 public class PlayerShooting : MonoBehaviour
 {
-    [Header("─── Ateş Ayarları ───")]
-    [Tooltip("İki mermi arasındaki süre (saniye).\n" +
-             "0.28 = HTML prototipindeki referans hız.\n" +
-             "Upgrade sistemi bu değeri runtime'da düşürecek.")]
+    [Header("─── Fire Settings ───")]
+    [Tooltip("Time between bullets (seconds).\n" +
+             "0.28 = reference speed from the HTML prototype.\n" +
+             "The upgrade system will lower this value at runtime.")]
     [SerializeField, Range(0.05f, 1f)]
     private float _fireInterval = 0.28f;
 
-    [Tooltip("Merminin geminin ne kadar üstünde spawn olacağı (world units).\n" +
-             "Çok düşük = mermi geminin içinden çıkıyor gibi görünür.\n" +
-             "Çok yüksek = mermi havada beliriyor gibi görünür.\n" +
-             "0.5 = geminin burnundan çıkış hissi.")]
+    [Tooltip("How far above the ship the bullet spawns (world units).\n" +
+             "Too low = the bullet appears to come from inside the ship.\n" +
+             "Too high = the bullet appears to materialize in mid-air.\n" +
+             "0.5 = feels like it exits from the ship's nose.")]
     [SerializeField, Range(0.1f, 1.5f)]
     private float _muzzleOffsetY = 0.5f;
 
-    [Header("─── Mermi Prefab ───")]
-    [Tooltip("Pool'un oluşturacağı mermi prefab'ı.\n" +
-             "Prefab'da Bullet.cs componenti olmalı.\n" +
-             "SpriteRenderer veya TrailRenderer opsiyonel.")]
+    [Header("─── Bullet Prefab ───")]
+    [Tooltip("Bullet prefab the pool will create.\n" +
+             "The prefab must have a Bullet.cs component.\n" +
+             "SpriteRenderer or TrailRenderer are optional.")]
     [SerializeField]
     private Bullet _bulletPrefab;
 
-    [Header("─── Pool Ayarları ───")]
-    [Tooltip("Başlangıçta oluşturulacak mermi sayısı.\n" +
-             "Çok düşük = ilk saniyelerde runtime Instantiate olur.\n" +
-             "Çok yüksek = gereksiz başlangıç bellek kullanımı.\n" +
-             "20 = ~5 saniye ateş kapasitesi (0.28 interval ile).")]
+    [Header("─── Pool Settings ───")]
+    [Tooltip("Number of bullets pre-created at startup.\n" +
+             "Too low = runtime Instantiate calls in the first few seconds.\n" +
+             "Too high = unnecessary startup memory usage.\n" +
+             "20 = ~5 seconds of fire capacity (at 0.28 interval).")]
     [SerializeField, Range(5, 50)]
     private int _poolDefaultCapacity = 20;
 
-    [Tooltip("Pool'da tutulacak maksimum inaktif mermi sayısı.\n" +
-             "Bu sınır aşılırsa fazla mermiler Destroy edilir.\n" +
-             "Memory leak koruması sağlar.")]
+    [Tooltip("Maximum number of inactive bullets kept in the pool.\n" +
+             "Excess bullets beyond this limit are Destroyed.\n" +
+             "Provides protection against memory leaks.")]
     [SerializeField, Range(20, 100)]
     private int _poolMaxSize = 50;
 
@@ -204,13 +204,13 @@ public class PlayerShooting : MonoBehaviour
     {
         if (_bulletPrefab == null)
             Debug.LogError(
-                "[PlayerShooting] Bullet Prefab atanmamış! " +
-                "Inspector'da _bulletPrefab alanına mermi prefab'ını sürükleyin.", this);
+                "[PlayerShooting] Bullet Prefab not assigned! " +
+                "Drag the bullet prefab onto the _bulletPrefab field in the Inspector.", this);
 
         if (_mainCamera == null)
             Debug.LogError(
-                "[PlayerShooting] MainCamera bulunamadı! " +
-                "Kameranın tag'ini kontrol edin.", this);
+                "[PlayerShooting] MainCamera not found! " +
+                "Check the camera's tag.", this);
     }
 
     #if UNITY_EDITOR
@@ -229,7 +229,7 @@ public class PlayerShooting : MonoBehaviour
         {
             UnityEditor.Handles.Label(
                 muzzle + Vector3.right * 0.5f,
-                $"Pool: {_bulletPool.CountActive} aktif / {_bulletPool.CountInactive} beklemede"
+                $"Pool: {_bulletPool.CountActive} active / {_bulletPool.CountInactive} waiting"
             );
         }
     }

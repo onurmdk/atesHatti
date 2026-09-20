@@ -3,25 +3,25 @@ using UnityEngine;
 [RequireComponent(typeof(SpriteRenderer))]
 public class Boss : MonoBehaviour, IDamageable
 {
-    [Header("─── Temel İstatistikler ───")]
+    [Header("─── Base Stats ───")]
     [SerializeField] private float _baseHp          = 35f;
     [SerializeField] private int   _baseGold        = 20;
     [SerializeField] private int   _baseDamage      = 2;
     [SerializeField] private float _baseBulletSpeed  = 5f;
 
-    [Header("─── Hareket ───")]
-    [Tooltip("Giriş fazında aşağı iniş hızı.")]
+    [Header("─── Movement ───")]
+    [Tooltip("Downward entry speed during the entry phase.")]
     [SerializeField] private float _entrySpeed       = 2f;
-    [Tooltip("Savaş fazında yatay ping-pong hızı.")]
+    [Tooltip("Horizontal ping-pong speed during the combat phase.")]
     [SerializeField] private float _horizontalSpeed  = 2.5f;
 
-    [Header("─── Saldırı ───")]
-    [Tooltip("İki ateş arası süre (saniye).")]
+    [Header("─── Attack ───")]
+    [Tooltip("Time between shots (seconds).")]
     [SerializeField] private float _fireInterval     = 1.5f;
-    [Tooltip("Spread açısı (derece). Yan mermiler bu kadar sapacak.")]
+    [Tooltip("Spread angle (degrees). Side bullets will deviate by this amount.")]
     [SerializeField] private float _spreadAngle      = 20f;
 
-    [Header("─── Mermi Prefab ───")]
+    [Header("─── Bullet Prefab ───")]
     [SerializeField] private BossBullet _bulletPrefab;
 
     private float _maxHp;

@@ -5,19 +5,19 @@ public class CombatManager : MonoBehaviour
 {
     public static CombatManager Instance { get; private set; }
 
-    [Header("─── Oyuncu Referansı ───")]
-    [Tooltip("Sahneye yerleştirilmiş Player objesi.\n" +
-             "PlayerHealth bileşenine erişim için gerekli.")]
+    [Header("─── Player Reference ───")]
+    [Tooltip("The Player object placed in the scene.\n" +
+             "Required to access the PlayerHealth component.")]
     [SerializeField]
     private PlayerHealth _playerHealth;
 
-    [Header("─── Hasar Ayarları ───")]
-    [Tooltip("Düşmanın oyuncuya body collision ile verdiği hasar.")]
+    [Header("─── Damage Settings ───")]
+    [Tooltip("Damage the enemy deals to the player on body collision.")]
     [SerializeField]
     private float _enemyBodyDamage = 1f;
 
-    [Tooltip("Oyuncu mermisinin base hasarı.\n" +
-             "İleride PlayerShooting'den okunacak (upgrade sistemi).")]
+    [Tooltip("Base damage of a player bullet.\n" +
+             "Will be read from PlayerShooting in the future (upgrade system).")]
     [SerializeField]
     private float _bulletBaseDamage = 1f;
 
@@ -142,7 +142,7 @@ public class CombatManager : MonoBehaviour
     {
         if (_playerHealth == null)
             Debug.LogError(
-                "[CombatManager] PlayerHealth referansı atanmamış! " +
-                "Inspector'da _playerHealth alanını doldurun.", this);
+                "[CombatManager] PlayerHealth reference not assigned! " +
+                "Fill the _playerHealth field in the Inspector.", this);
     }
 }

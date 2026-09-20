@@ -32,7 +32,7 @@ public class GoldManager : MonoBehaviour
             _currentGold = SaveManager.Instance.PersistentGold;
 
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.Log($"[GoldManager] Kayıtlı altın yüklendi: {_currentGold}");
+            Debug.Log($"[GoldManager] Saved gold loaded: {_currentGold}");
             #endif
 
             OnGoldChanged?.Invoke(_currentGold);
@@ -58,8 +58,8 @@ public class GoldManager : MonoBehaviour
         else
         {
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.LogWarning("[GoldManager] CombatManager.Instance bulunamadı! " +
-                             "Altın toplama çalışmayacak.", this);
+            Debug.LogWarning("[GoldManager] CombatManager.Instance not found! " +
+                             "Gold collection will not work.", this);
             #endif
         }
     }
